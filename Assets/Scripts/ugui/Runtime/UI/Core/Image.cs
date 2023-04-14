@@ -22,7 +22,7 @@ namespace UnityEngine.UI
   /// <summary>
   ///   Displays a Sprite inside the UI System.
   /// </summary>
-  public class Image : MaskableGraphic, ISerializationCallbackReceiver, ILayoutElement, ICanvasRaycastFilter
+  public sealed class Image : MaskableGraphic, ISerializationCallbackReceiver, ILayoutElement, ICanvasRaycastFilter
   {
     /// <summary>
     /// Image fill type controls how to display the image.
@@ -837,14 +837,14 @@ namespace UnityEngine.UI
     /// <summary>
     /// See ISerializationCallbackReceiver.
     /// </summary>
-    public virtual void OnBeforeSerialize()
+    public void OnBeforeSerialize()
     {
     }
 
     /// <summary>
     /// See ISerializationCallbackReceiver.
     /// </summary>
-    public virtual void OnAfterDeserialize()
+    public void OnAfterDeserialize()
     {
       if (m_FillOrigin < 0)
         m_FillOrigin = 0;
@@ -931,34 +931,35 @@ namespace UnityEngine.UI
     /// <summary>
     /// Update the UI renderer mesh.
     /// </summary>
-    protected override JobHandle? OnPopulateMesh(VertexHelper toFill)
+    private void OnPopulateMesh2(VertexHelper toFill)
     {
-      if (activeSprite == null)
-      {
-        base.OnPopulateMesh(toFill);
-        return null;
-      }
+      GenerateSlicedSprite(toFill);
+      // if (activeSprite == null)
+      // {
+        // base.OnPopulateMesh(toFill);
+        // return null;
+      // }
 
-      switch (type)
-      {
-        case Type.Simple:
-          if (!useSpriteMesh)
-            GenerateSimpleSprite(toFill, m_PreserveAspect);
-          else
-            GenerateSprite(toFill, m_PreserveAspect);
-          break;
-        case Type.Sliced:
-          return GenerateSlicedSprite(toFill);
-          break;
-        case Type.Tiled:
-          GenerateTiledSprite(toFill);
-          break;
-        case Type.Filled:
-          GenerateFilledSprite(toFill, m_PreserveAspect);
-          break;
-      }
+      // switch (type)
+      // {
+        // case Type.Simple:
+          // if (!useSpriteMesh)
+            // GenerateSimpleSprite(toFill, m_PreserveAspect);
+          // else
+            // GenerateSprite(toFill, m_PreserveAspect);
+          // break;
+        // case Type.Sliced:
+          // return GenerateSlicedSprite(toFill);
+          // break;
+        // case Type.Tiled:
+          // GenerateTiledSprite(toFill);
+          // break;
+        // case Type.Filled:
+          // GenerateFilledSprite(toFill, m_PreserveAspect);
+          // break;
+      // }
 
-      return null;
+      // return null;
     }
 
     private void TrackSprite()
@@ -1093,6 +1094,22 @@ namespace UnityEngine.UI
     [NonSerialized]
     private bool _init = false;
 
+
+    protected sealed override void UpdateGeometry(Mesh.MeshData meshData)
+    {
+      if (s_VertexHelper == null)
+        s_VertexHelper = new(); //
+
+      s_VertexHelper.SetMeshData(meshData);
+      Profiler.BeginSample("Populate 2");
+      // var rectTransformRect = rectTransform?.rect ?? default;
+      // if (rectTransform is not null && rectTransformRect.width >= 0 && rectTransformRect.height >= 0)
+        OnPopulateMesh2(s_VertexHelper);
+
+      Profiler.EndSample();
+      // SetMesh(null);
+    }
+
     /// <summary>
     /// Generate vertices for a 9-sliced Image.
     /// </summary>
@@ -1154,22 +1171,24 @@ namespace UnityEngine.UI
 
       toFill.Clear();
 
-      if (toFill.m_Vertices.Length != 9 * 4)
+      // if (toFill.m_Vertices.Length != 9 * 4)
       {
-        toFill.m_Vertices.Length = 9 * 4;
-        toFill.m_Indices.Length = 9 * 6;
+        toFill.Reinit(9 * 4, 9 * 6);
+        // toFill.m_Vertices.Length = 9 * 4;
+        // toFill.m_Indices.Length = 9 * 6;
       }
 
       var job = new FillSlicedJob
       {
-        Verticies = toFill.m_Vertices.AsArray(),
-        Indicies = toFill.m_Indices.AsArray(),
+        Verticies = toFill.m_Vertices,
+        Indicies = toFill.m_Indices,
         Color = colorFloat,
         s_VertScratch = s_VertScratch,
         s_UVScratch = s_UVScratch
       };
 
       job.Run();
+      // SetMesh(null);
       return null;
       // return job.Schedule();
       // job.Run();
@@ -1179,9 +1198,13 @@ namespace UnityEngine.UI
     [BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
     public struct FillSlicedJob : IJob
     {
-      [NoAlias] public NativeArray<VertexHelper.VertexData> Verticies;
+      [NoAlias] 
+      [NativeDisableContainerSafetyRestriction]
+      public NativeArray<VertexHelper.VertexData> Verticies;
 
-      [NoAlias] public NativeArray<int> Indicies;
+      [NoAlias] 
+      [NativeDisableContainerSafetyRestriction]
+      public NativeArray<ushort> Indicies;
 
       [ReadOnly] [NoAlias] public NativeArray<float2> s_VertScratch;
 
@@ -1203,11 +1226,11 @@ namespace UnityEngine.UI
       }
 
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      private void AddQuad(int startIndex, int y, int x, int x2)
+      private void AddQuad(ushort startIndex, int y, int x, int x2)
       {
         int y2 = y + 1;
-        int vertIndex = startIndex * 4;
-        int indIndex = startIndex * 6;
+        var vertIndex = (ushort)(startIndex * 4);
+        var indIndex = (ushort)(startIndex * 6);
 
         var posMin = new float2(s_VertScratch[x].x, s_VertScratch[y].y);
         var posMax = new float2(s_VertScratch[x2].x, s_VertScratch[y2].y);
@@ -1220,12 +1243,12 @@ namespace UnityEngine.UI
         Verticies[vertIndex + 3] = (CreateVert(new(posMax.x, posMin.y, 0), Color, new(uvMax.x, uvMin.y, 0, 0)));
 
         Indicies[indIndex + 0] = (vertIndex);
-        Indicies[indIndex + 1] = (vertIndex + 1);
-        Indicies[indIndex + 2] = (vertIndex + 2);
+        Indicies[indIndex + 1] = (ushort)(vertIndex + 1);
+        Indicies[indIndex + 2] = (ushort)(vertIndex + 2);
 
-        Indicies[indIndex + 3] = (vertIndex + 2);
-        Indicies[indIndex + 4] = (vertIndex + 3);
-        Indicies[indIndex + 5] = (vertIndex);
+        Indicies[indIndex + 3] = (ushort)(vertIndex + 2);
+        Indicies[indIndex + 4] = (ushort)(vertIndex + 3);
+        Indicies[indIndex + 5] = vertIndex;
       }
 
       private VertexHelper.VertexData CreateVert(float3 pos,
@@ -1516,13 +1539,13 @@ namespace UnityEngine.UI
 
     static void AddQuad(VertexHelper vertexHelper, float3[] quadPositions, float4 color, float4[] quadUVs)
     {
-      int startIndex = vertexHelper.currentVertCount;
+      var startIndex = (ushort)vertexHelper.currentVertCount;
 
       for (int i = 0; i < 4; ++i)
         vertexHelper.AddVert(quadPositions[i], color, quadUVs[i]);
 
-      vertexHelper.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
-      vertexHelper.AddTriangle(startIndex + 2, startIndex + 3, startIndex);
+      // vertexHelper.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
+      // vertexHelper.AddTriangle(startIndex + 2, startIndex + 3, startIndex);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1533,15 +1556,15 @@ namespace UnityEngine.UI
       float2 uvMin,
       float2 uvMax)
     {
-      int startIndex = vertexHelper.currentVertCount;
+      uint startIndex = (uint)vertexHelper.currentVertCount;
 
       vertexHelper.AddVert(new(posMin.x, posMin.y, 0), color, new(uvMin.x, uvMin.y, 0, 0));
       vertexHelper.AddVert(new(posMin.x, posMax.y, 0), color, new(uvMin.x, uvMax.y, 0, 0));
       vertexHelper.AddVert(new(posMax.x, posMax.y, 0), color, new(uvMax.x, uvMax.y, 0, 0));
       vertexHelper.AddVert(new(posMax.x, posMin.y, 0), color, new(uvMax.x, uvMin.y, 0, 0));
 
-      vertexHelper.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
-      vertexHelper.AddTriangle(startIndex + 2, startIndex + 3, startIndex);
+      // vertexHelper.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
+      // vertexHelper.AddTriangle(startIndex + 2, startIndex + 3, startIndex);
     }
 
     private float4 GetAdjustedBorders(float4 border, Rect adjustedRect)
@@ -1895,21 +1918,21 @@ namespace UnityEngine.UI
     /// <summary>
     /// See ILayoutElement.CalculateLayoutInputHorizontal.
     /// </summary>
-    public virtual void CalculateLayoutInputHorizontal()
+    public void CalculateLayoutInputHorizontal()
     {
     }
 
     /// <summary>
     /// See ILayoutElement.CalculateLayoutInputVertical.
     /// </summary>
-    public virtual void CalculateLayoutInputVertical()
+    public void CalculateLayoutInputVertical()
     {
     }
 
     /// <summary>
     /// See ILayoutElement.minWidth.
     /// </summary>
-    public virtual float minWidth
+    public float minWidth
     {
       get { return 0; }
     }
@@ -1918,7 +1941,7 @@ namespace UnityEngine.UI
     /// If there is a sprite being rendered returns the size of that sprite.
     /// In the case of a slided or tiled sprite will return the calculated minimum size possible
     /// </summary>
-    public virtual float preferredWidth
+    public float preferredWidth
     {
       get
       {
@@ -1933,7 +1956,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// See ILayoutElement.flexibleWidth.
     /// </summary>
-    public virtual float flexibleWidth
+    public float flexibleWidth
     {
       get { return -1; }
     }
@@ -1941,7 +1964,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// See ILayoutElement.minHeight.
     /// </summary>
-    public virtual float minHeight
+    public float minHeight
     {
       get { return 0; }
     }
@@ -1950,7 +1973,7 @@ namespace UnityEngine.UI
     /// If there is a sprite being rendered returns the size of that sprite.
     /// In the case of a slided or tiled sprite will return the calculated minimum size possible
     /// </summary>
-    public virtual float preferredHeight
+    public float preferredHeight
     {
       get
       {
@@ -1965,7 +1988,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// See ILayoutElement.flexibleHeight.
     /// </summary>
-    public virtual float flexibleHeight
+    public float flexibleHeight
     {
       get { return -1; }
     }
@@ -1973,7 +1996,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// See ILayoutElement.layoutPriority.
     /// </summary>
-    public virtual int layoutPriority
+    public int layoutPriority
     {
       get { return 0; }
     }
@@ -1985,7 +2008,7 @@ namespace UnityEngine.UI
     /// <param name="eventCamera">The camera in which to use to calculate the coordinating position</param>
     /// <returns>If the location is a valid hit or not.</returns>
     /// <remarks> Also see See:ICanvasRaycastFilter.</remarks>
-    public virtual bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
+    public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
     {
       if (alphaHitTestMinimumThreshold <= 0)
         return true;

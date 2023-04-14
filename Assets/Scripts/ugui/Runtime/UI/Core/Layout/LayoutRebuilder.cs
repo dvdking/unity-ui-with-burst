@@ -48,7 +48,13 @@ namespace UnityEngine.UI
             return;
         }
 
+        public void SetMesh()
+        {
+        }
+
         public Transform transform { get { return m_ToRebuild; }}
+        public Mesh workerMesh { get; }
+        public VertexHelper s_VertexHelper { get; }
 
         /// <summary>
         /// Has the native representation of this LayoutRebuilder been destroyed?
@@ -75,11 +81,11 @@ namespace UnityEngine.UI
         {
             var rebuilder = s_Rebuilders.Get();
             rebuilder.Initialize(layoutRoot);
-            rebuilder.Rebuild(CanvasUpdate.Layout);
+            rebuilder.Rebuild(CanvasUpdate.Layout, default);
             s_Rebuilders.Release(rebuilder);
         }
 
-        public JobHandle? Rebuild(CanvasUpdate executing)
+        public void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData)
         {
             switch (executing)
             {
@@ -94,8 +100,6 @@ namespace UnityEngine.UI
                     PerformLayoutControl(m_ToRebuild, e => (e as ILayoutController).SetLayoutVertical());
                     break;
             }
-
-            return null;
         }
 
         private void PerformLayoutControl(RectTransform rect, UnityAction<Component> action)

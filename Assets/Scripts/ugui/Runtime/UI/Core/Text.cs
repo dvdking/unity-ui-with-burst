@@ -89,7 +89,7 @@ namespace UnityEngine.UI
             // if we detect the font texture has changed and are in a rebuild loop
             // we just regenerate the verts for the new UV's
             if (CanvasUpdateRegistry.IsRebuildingGraphics() || CanvasUpdateRegistry.IsRebuildingLayout())
-                UpdateGeometry();
+                UpdateGeometry(default);
             else
             {
                 SetAllDirty();
@@ -574,14 +574,14 @@ namespace UnityEngine.UI
             base.OnDisable();
         }
 
-        protected override JobHandle? UpdateGeometry()
+        protected override void UpdateGeometry(Mesh.MeshData meshData)
         {
             if (font != null)
             {
-                return base.UpdateGeometry();
+                base.UpdateGeometry(default);
             }
 
-            return null;
+            return;
         }
 
 #if UNITY_EDITOR

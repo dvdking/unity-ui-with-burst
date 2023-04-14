@@ -2701,7 +2701,8 @@ namespace UnityEngine.UI
         /// Rebuild the input fields geometry. (caret and highlight).
         /// </summary>
         /// <param name="update">Which update loop we are in.</param>
-        public virtual JobHandle? Rebuild(CanvasUpdate update)
+        /// <param name="meshData"></param>
+        public virtual void Rebuild(CanvasUpdate update, Mesh.MeshData meshData)
         {
             switch (update)
             {
@@ -2709,13 +2710,18 @@ namespace UnityEngine.UI
                     UpdateGeometry();
                     break;
             }
+        }
 
-            return null;
+        public void SetMesh()
+        {
         }
 
         public void SetMesh(JobHandle? handle)
         {
         }
+
+        public Mesh workerMesh { get; }
+        public VertexHelper s_VertexHelper { get; }
 
         /// <summary>
         /// See ICanvasElement.LayoutComplete. Does nothing by default.

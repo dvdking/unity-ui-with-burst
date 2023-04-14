@@ -35,20 +35,31 @@ public class StressTest : MonoBehaviour
     yield return null;
     _data = new NativeArray<MovingRect>(Count, Allocator.Persistent);
     yield return null;
+    var go = new GameObject("CanvasGo");
+    go.AddComponent<RectTransform>();
+    go.transform.SetParent(transform);
+    go.GetComponent<RectTransform>().anchoredPosition = default;
+    go.transform.localScale = Vector3.one;
+    
+    go.AddComponent<Canvas>();
+    
+    var lastCanvas = Instantiate(go, transform);
+    
     for (int i = 0; i < Count; i++)
     {
-      var p = Instantiate(Prefab, transform);
+      var p = Instantiate(Prefab, lastCanvas.transform);
       _transforms.Add(p.GetComponent<RectTransform>());
       _graphics.Add(p.GetComponent<Graphic>());
       _data[i] = new MovingRect();
-      
+
       if (i % 500 == 0)
+      {
+        lastCanvas = Instantiate(go, transform);
         yield return null;
+      }
     }
 
     ChangeTimer = ChangeTimerDurstion;
-    
-    Dt.transform.SetAsLastSibling();
   }
   
   private void OnDestroy()
@@ -84,8 +95,9 @@ public class StressTest : MonoBehaviour
       {
         var t = _data[i];
         {
-          t.Velocity = Random.insideUnitCircle * Random.Range(1f, 1000f);
+          t.Velocity = Random.insideUnitCircle * Random.Range(1f, 100f);
           var tTargetColor = Random.ColorHSV();
+          tTargetColor.a = Random.value;
           t.TargetColor = new(tTargetColor.r, tTargetColor.g, tTargetColor.b, tTargetColor.a);
         }
         _data[i] = t;
@@ -116,6 +128,14 @@ public class StressTest : MonoBehaviour
         t.Postion += t.Velocity * Dt;
         t.CurrentColor = math.lerp(t.CurrentColor, t.TargetColor, Dt);
         
+        Data[i] = t;
+      }
+      
+      //limit position
+      for (int i = 0; i < Data.Length; i++)
+      {
+        var t = Data[i];
+        t.Postion = math.clamp(t.Postion, new float2(-1000f, -1000f), new float2(1000f, 1000f));
         Data[i] = t;
       }
     }

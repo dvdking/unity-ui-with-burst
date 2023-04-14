@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Unity.Burst;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine.Pool;
 using UnityEngine.Profiling;
@@ -48,19 +45,13 @@ namespace UnityEngine.UI
   /// ]]>
   ///</code>
   /// </example>
-  public unsafe class VertexHelper : IDisposable
+  public class VertexHelper : IDisposable
   {
-    // private NativeList<float3> m_Positions;
-    // private NativeList<float4> m_Colors;
-    // private NativeList<float4> m_Uv0S;
-    // private NativeList<float4> m_Uv1S;
-    // private NativeList<float4> m_Uv2S;
-    // private NativeList<float4> m_Uv3S;
-    // private NativeList<float3> m_Normals;
-    // private NativeList<float4> m_Tangents;
+    public int _currentVertIndex;
+    public int _currentIndicesIndex;
+    
     public NativeArray<VertexData> m_Vertices;
-
-    public NativeArray<uint> m_Indices;
+    public NativeArray<ushort> m_Indices;
 
     public static readonly float4 s_DefaultTangent = new Vector4(1.0f, 0.0f, 0.0f, -1.0f);
     public static readonly float3 s_DefaultNormal = new float3(0, 0, -1);
@@ -70,43 +61,58 @@ namespace UnityEngine.UI
 
     public VertexHelper()
     {
-      _dataArray = Mesh.AllocateWritableMeshData(1);
-      _data = _dataArray[0];
-
-      _arr = new NativeList<VertexAttributeDescriptor>(8, Allocator.Persistent)
+      _arr = new(8, Allocator.Persistent)
       {
-        new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
-        new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
-        new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord2, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord3, VertexAttributeFormat.Float32, 4),
+        new(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+        new(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
+        new(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4),
+        new(VertexAttribute.Color, VertexAttributeFormat.Float32, 4),
+        new(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 4),
+        new(VertexAttribute.TexCoord1, VertexAttributeFormat.Float32, 4),
+        new(VertexAttribute.TexCoord2, VertexAttributeFormat.Float32, 4),
+        new(VertexAttribute.TexCoord3, VertexAttributeFormat.Float32, 4),
       };
     }
 
-    public void Reinit(int size)
+    public void SetMeshData(Mesh.MeshData meshData)
     {
-      if (!m_ListsInitalized)
-      {
-        _data.SetVertexBufferParams(64, _arr.AsArray());
-        _data.SetIndexBufferParams(128, IndexFormat.UInt32);
+      _data = meshData;
+    }
 
-        m_Vertices = _data.GetVertexData<VertexData>();
-        m_Indices = _data.GetIndexData<uint>();
-        // m_Positions = new(Allocator.Persistent);
-        // m_Colors = new(Allocator.Persistent);
-        // m_Uv0S = new(Allocator.Persistent);
-        // m_Uv1S = new(Allocator.Persistent);
-        // m_Uv2S = new(Allocator.Persistent);
-        // m_Uv3S = new(Allocator.Persistent);
-        // m_Normals = new(Allocator.Persistent);
-        // m_Tangents = new(Allocator.Persistent);
-        // m_Vertices = new(Allocator.Persistent);
-        // m_Indices = new(Allocator.Persistent);
-        m_ListsInitalized = true;
-      }
+    public void Reinit(int sizeVert, int sizeInd)
+    {
+      // if (!m_Lm_Vertices.LengthistsInitalized)
+      _sizeVert = 0;
+      _sizeInd = 0;
+      
+      // _dataArray = Mesh.AllocateWritableMeshData(1);
+      // _data = _dataArray[0];
+
+      // if (_sizeVert == sizeVert && _sizeInd == sizeInd)
+        // return;
+                                         
+      _sizeVert = sizeVert;
+      _sizeInd = sizeInd;
+
+      _currentIndicesIndex = 0;
+      _currentVertIndex = 0;
+
+      _data.SetVertexBufferParams(sizeVert, _arr.AsArray());
+      m_Vertices = _data.GetVertexData<VertexData>();
+      _data.SetIndexBufferParams(sizeInd, IndexFormat.UInt16);
+      m_Indices = _data.GetIndexData<ushort>();
+              // One sub-mesh with all the indices.
+      // m_Positions = new(Allocator.Persistent);
+      // m_Colors = new(Allocator.Persistent);
+      // m_Uv0S = new(Allocator.Persistent);
+      // m_Uv1S = new(Allocator.Persistent);
+      // m_Uv2S = new(Allocator.Persistent);
+      // m_Uv3S = new(Allocator.Persistent);
+      // m_Normals = new(Allocator.Persistent);
+      // m_Tangents = new(Allocator.Persistent);
+      // m_Vertices = new(Allocator.Persistent);
+      // m_Indices = new(Allocator.Persistent);
+      m_ListsInitalized = true;
     }
 
     /// <summary>
@@ -114,16 +120,9 @@ namespace UnityEngine.UI
     /// </summary>
     public void Dispose()
     {
+      _arr.Dispose();
       if (m_ListsInitalized)
       {
-        // m_Positions.Dispose();
-        // m_Colors.Dispose();
-        // m_Uv0S.Dispose();
-        // m_Uv1S.Dispose();
-        // m_Uv2S.Dispose();
-        // m_Uv3S.Dispose();
-        // m_Normals.Dispose();
-        // m_Tangents.Dispose();
         m_Vertices.Dispose();
         m_Indices.Dispose();
 
@@ -147,20 +146,20 @@ namespace UnityEngine.UI
         // m_Uv3S.Clear();
         // m_Normals.Clear();
         // m_Tangents.Clear();
-        m_Vertices.Clear();
-        m_Indices.Clear();
+        // m_Vertices.Clear();
+        // m_Indices.Clear();
       }
     }
 
     /// <summary>
     /// Current number of vertices in the buffer.
     /// </summary>
-    public int currentVertCount => m_Vertices.Length;
+    public int currentVertCount => _currentVertIndex;
 
     /// <summary>
     /// Get the number of indices set on the VertexHelper.
     /// </summary>
-    public int currentIndexCount => m_Indices.Length;
+    public int currentIndexCount => _currentIndicesIndex;
 
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     public struct VertexData
@@ -176,8 +175,11 @@ namespace UnityEngine.UI
     }
 
     private int _prevVertexCount = -1;
+
     private Mesh.MeshDataArray _dataArray;
+
     private Mesh.MeshData _data;
+
     private NativeList<VertexAttributeDescriptor> _arr;
 
     /// <summary>
@@ -185,131 +187,13 @@ namespace UnityEngine.UI
     /// </summary>
     public unsafe void FillMesh(Mesh mesh)
     {
-      _layout ??= new[]
-      {
-        new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
-        new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
-        new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord2, VertexAttributeFormat.Float32, 4),
-        new VertexAttributeDescriptor(VertexAttribute.TexCoord3, VertexAttributeFormat.Float32, 4),
-      };
-
-
-      // mesh.Clear();
-
       if (m_Vertices.Length >= 65000)
         throw new ArgumentException("Mesh can not have more than 65000 vertices");
 
-
-      Profiler.BeginSample("Prepare data");
-
-
-      Profiler.BeginSample("Set vertexBuffer params");
-      var vertexCount = m_Vertices.Length;
-      if (_prevVertexCount != vertexCount)
-      {
-        _prevVertexCount = vertexCount;
-
-        mesh.SetVertexBufferParams(vertexCount, _layout);
-      }
-
-      Profiler.EndSample();
-
-
-      Profiler.EndSample();
-
       Profiler.BeginSample("Set vertecies");
 
-      mesh.SetVertexBufferData(m_Vertices.AsArray(), 0, 0, vertexCount);
-
-      Profiler.EndSample();
-      Profiler.BeginSample("Set indicies");
-      mesh.SetIndices(m_Indices.AsArray(), MeshTopology.Triangles, 0);
-      Profiler.EndSample();
-
-      Profiler.BeginSample("Recalc bounds");
-      mesh.RecalculateBounds();
-      Profiler.EndSample();
-    }
-
-    [BurstCompile(FloatPrecision.Standard, FloatMode.Fast)]
-    public struct FillBufferJob : IJob
-    {
-      [NoAlias] [ReadOnly] public NativeArray<float3> m_Positions;
-      [NoAlias] [ReadOnly] public NativeArray<float4> m_Colors;
-
-      [NoAlias] [ReadOnly] public NativeArray<float4> m_Uv0S;
-
-      // public NativeList<float4> m_Uv1S;
-      // public NativeList<float4> m_Uv2S;
-      // public NativeList<float4> m_Uv3S;
-      [NoAlias] [ReadOnly] public NativeArray<float3> m_Normals;
-      [NoAlias] [ReadOnly] public NativeArray<float4> m_Tangents;
-
-      [NativeDisableUnsafePtrRestriction] public unsafe VertexData* buffer;
-      public int vertexCount;
-
-      public unsafe void Execute()
-      {
-        for (int i = 0; i < vertexCount; i++)
-        {
-          buffer[i] = new()
-          {
-            pos = m_Positions[i],
-
-            normal = m_Normals[i],
-            tangent = m_Tangents[i],
-            color = m_Colors[i],
-            uv0 = m_Uv0S[i],
-            // uv1 = m_Uv1S[i],
-            // uv2 = m_Uv2S[i],
-            // uv3 = m_Uv3S[i],
-
-            uv1 = default,
-            uv2 = default,
-            uv3 = default,
-          };
-        }
-
-
-        // for (int i = 0; i < vertexCount; i++)
-        // {
-        //   var p = i;
-        //   buffer[p].pos = m_Positions[i];
-        // }
-        //
-        // for (int i = 0; i < vertexCount; i++)
-        // {
-        //   var p = i;
-        //   buffer[p].normal = m_Normals[i];
-        // }
-        //
-        // for (int i = 0; i < vertexCount; i++)
-        // {
-        //   var p = i;
-        //   buffer[p].tangent = m_Tangents[i];
-        // }
-        //
-        // for (int i = 0; i < vertexCount; i++)
-        // {
-        //   var p = i;
-        //
-        //   buffer[p].color = m_Colors[i];
-        // }
-        //
-        // for (int i = 0; i < vertexCount; i++)
-        // {
-        //   var p = i;
-        //
-        //   buffer[p].uv0 = m_Uv0S[i];
-        //   buffer[p].uv1 = default;
-        //   buffer[p].uv2 = default;
-        //   buffer[p].uv3 = default;
-        // }
-      }
+      _data.subMeshCount = 1;
+      _data.SetSubMesh(0, new(0, m_Indices.Length));
     }
 
     /// <summary>
@@ -333,7 +217,7 @@ namespace UnityEngine.UI
       float3 normal,
       float4 tangent)
     {
-      m_Vertices.Add(new()
+      m_Vertices[_currentVertIndex++]= (new()
       {
         pos = position,
         normal = normal,
@@ -389,11 +273,14 @@ namespace UnityEngine.UI
     /// <param name="idx1">index 1</param>
     /// <param name="idx2">index 2</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AddTriangle(int idx0, int idx1, int idx2)
+    public void AddTriangle(ushort idx0, ushort idx1, ushort idx2)
     {
-      m_Indices.Add(idx0);
-      m_Indices.Add(idx1);
-      m_Indices.Add(idx2);
+      m_Indices[_currentIndicesIndex++] = idx0;
+      m_Indices[_currentIndicesIndex++] = idx1;
+      m_Indices[_currentIndicesIndex++] = idx2;
+      // m_Indices.Add(idx0);
+      // m_Indices.Add(idx1);
+      // m_Indices.Add(idx2);
     }
 
     /// <summary>

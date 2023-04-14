@@ -528,7 +528,8 @@ namespace UnityEngine.UI
         /// Rebuilds the scroll rect data after initialization.
         /// </summary>
         /// <param name="executing">The current step in the rendering CanvasUpdate cycle.</param>
-        public virtual JobHandle? Rebuild(CanvasUpdate executing)
+        /// <param name="meshData"></param>
+        public virtual void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData)
         {
             if (executing == CanvasUpdate.Prelayout)
             {
@@ -544,12 +545,18 @@ namespace UnityEngine.UI
                 m_HasRebuiltLayout = true;
             }
 
-            return null;
+        }
+
+        public void SetMesh()
+        {
         }
 
         public void SetMesh(JobHandle? handle)
         {
         }
+
+        public Mesh workerMesh { get; }
+        public VertexHelper s_VertexHelper { get; }
 
         public virtual void LayoutComplete()
         {}

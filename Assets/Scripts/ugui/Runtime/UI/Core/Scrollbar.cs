@@ -175,19 +175,25 @@ namespace UnityEngine.UI
 
 #endif // if UNITY_EDITOR
 
-        public virtual JobHandle? Rebuild(CanvasUpdate executing)
+        public virtual void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData)
         {
 #if UNITY_EDITOR
             if (executing == CanvasUpdate.Prelayout)
                 onValueChanged.Invoke(value);
 #endif
-            return null;
+        }
+
+        public void SetMesh()
+        {
         }
 
         public void SetMesh(JobHandle? handle)
         {
             
         }
+
+        public Mesh workerMesh { get; }
+        public VertexHelper s_VertexHelper { get; }
 
         /// <summary>
         /// See ICanvasElement.LayoutComplete.

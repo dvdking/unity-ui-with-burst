@@ -46,14 +46,18 @@ namespace UnityEngine.UI
         /// Rebuild the element for the given stage.
         /// </summary>
         /// <param name="executing">The current CanvasUpdate stage being rebuild.</param>
-        JobHandle? Rebuild(CanvasUpdate executing);
+        /// <param name="meshData"></param>
+        void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData);
 
-        void SetMesh(JobHandle? handle);
+        void SetMesh();
 
         /// <summary>
         /// Get the transform associated with the ICanvasElement.
         /// </summary>
         Transform transform { get; }
+
+        Mesh workerMesh { get; }
+        VertexHelper  s_VertexHelper { get; }
 
         /// <summary>
         /// Callback sent when this ICanvasElement has completed layout.
@@ -162,7 +166,8 @@ namespace UnityEngine.UI
         }
 
         private static readonly Comparison<ICanvasElement> s_SortLayoutFunction = SortLayoutList;
-        private List<JobHandle?> _jobs;
+        private Mesh.MeshDataArray _dataArray;
+        private List<Mesh> _meshes;
 
         private void PerformUpdate()
         {
@@ -183,7 +188,7 @@ namespace UnityEngine.UI
                     try
                     {
                         if (ObjectValidForUpdate(rebuild))
-                            rebuild.Rebuild((CanvasUpdate)i);
+                            rebuild.Rebuild((CanvasUpdate)i, default);
                     }
                     catch (Exception e)
                     {
@@ -208,11 +213,11 @@ namespace UnityEngine.UI
 
             m_PerformingGraphicUpdate = true;
 
-            _jobs ??= new();
-            _jobs.Clear();
-            
             for (var i = (int)CanvasUpdate.PreRender; i < (int)CanvasUpdate.MaxUpdateValue; i++)
             {
+                if (i == (int)CanvasUpdate.PreRender)
+                  _dataArray = Mesh.AllocateWritableMeshData(m_GraphicRebuildQueue.Count);
+                
                 UnityEngine.Profiling.Profiler.BeginSample(m_CanvasUpdateProfilerStrings[i]);
                 var count = m_GraphicRebuildQueue.Count;
                 for (var k = 0; k < count; k++)
@@ -222,11 +227,9 @@ namespace UnityEngine.UI
                         var element = m_GraphicRebuildQueue[k];
                         if (ObjectValidForUpdate(element))
                         {
-                            var job = element.Rebuild((CanvasUpdate)i);
-                            _jobs.Add(job);
-                            
-                            if(k != 0 && k % 500 == 0)
-                                JobHandle.ScheduleBatchedJobs();
+                            var meshData = i == 3 ? _dataArray[k] : default;
+                            var image = (Image)element; 
+                            image.Rebuild((CanvasUpdate)i, meshData);
                         }
                     }
                     catch (Exception e)
@@ -236,15 +239,29 @@ namespace UnityEngine.UI
                 }
 
 
+                _meshes ??= new List<Mesh>();
+                    _meshes.Clear();
                 if (i == (int)CanvasUpdate.PreRender)
                 {
                     for (var k = 0; k < m_GraphicRebuildQueue.Count; k++)
                     {
                         var element = m_GraphicRebuildQueue[k];
-                        element.SetMesh(_jobs[k]);
+                        _meshes.Add(element.workerMesh);
+
+                        var meshData = _dataArray[k];
+                        meshData.subMeshCount = 1;
+                        meshData.SetSubMesh(0, new(0, element.s_VertexHelper.m_Indices.Length));
                     }
-                    
-                    _jobs.Clear();
+
+                    Mesh.ApplyAndDisposeWritableMeshData(_dataArray, _meshes); //, MeshUpdateFlags.DontValidateIndices);
+
+                    for (var k = 0; k < m_GraphicRebuildQueue.Count; k++)
+                    {
+                        var element = m_GraphicRebuildQueue[k];
+                        element.SetMesh();
+                    }
+
+                    _meshes.Clear();
                 }
 
 

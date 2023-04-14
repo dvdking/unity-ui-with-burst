@@ -167,8 +167,8 @@ namespace UnityEngine.UI
         [NonSerialized] protected UnityAction m_OnDirtyVertsCallback;
         [NonSerialized] protected UnityAction m_OnDirtyMaterialCallback;
 
-        [NonSerialized] protected static Mesh s_Mesh;
-        [NonSerialized] private VertexHelper s_VertexHelper;
+        [NonSerialized] protected Mesh s_Mesh;
+        // [NonSerialized] public VertexHelper s_VertexHelper;
 
         [NonSerialized] protected Mesh m_CachedMesh;
         [NonSerialized] protected Vector2[] m_CachedUvs;
@@ -593,22 +593,22 @@ namespace UnityEngine.UI
         /// Rebuilds the graphic geometry and its material on the PreRender cycle.
         /// </summary>
         /// <param name="update">The current step of the rendering CanvasUpdate cycle.</param>
+        /// <param name="meshData"></param>
         /// <remarks>
         /// See CanvasUpdateRegistry for more details on the canvas update cycle.
         /// </remarks>
-        public virtual JobHandle? Rebuild(CanvasUpdate update)
+        public virtual void Rebuild(CanvasUpdate update, Mesh.MeshData meshData)
         {
             if (canvasRenderer == null || canvasRenderer.cull)
-                return null;
+                return;
 
-            JobHandle? handle = null;
             switch (update)
             {
                 case CanvasUpdate.PreRender:
                     if (m_VertsDirty)
                     {
                         Profiler.BeginSample("Geom");
-                        handle = UpdateGeometry();
+                        UpdateGeometry(meshData);
                         m_VertsDirty = false;
                         Profiler.EndSample();
                     }
@@ -621,9 +621,9 @@ namespace UnityEngine.UI
                     }
                     break;
             }
-
-            return handle;
         }
+
+        public VertexHelper s_VertexHelper { get; set; }
 
         public virtual void LayoutComplete()
         {}
@@ -647,37 +647,37 @@ namespace UnityEngine.UI
         /// <summary>
         /// Call to update the geometry of the Graphic onto the CanvasRenderer.
         /// </summary>
-        protected virtual JobHandle? UpdateGeometry()
+        /// <param name="meshData"></param>
+        protected virtual void UpdateGeometry(Mesh.MeshData meshData)
         {
             if (s_VertexHelper == null)
                 s_VertexHelper = new(); //
-            
+
+            s_VertexHelper.SetMeshData(meshData);
             Profiler.BeginSample("Populate");
-            JobHandle? handle = null;
             if (rectTransform != null && rectTransform.rect.width >= 0 && rectTransform.rect.height >= 0)
-                handle = OnPopulateMesh(s_VertexHelper);
+                OnPopulateMesh(s_VertexHelper);
             else
                 s_VertexHelper.Clear(); // clear the vertex helper so invalid graphics dont draw.
             
             Profiler.EndSample();
             // SetMesh(null);
-            return handle;
-
         }
 
-        public void SetMesh(JobHandle? handle)
+        public void SetMesh()
         {
-            handle?.Complete();
+            // handle?.Complete();
             
-            Profiler.BeginSample("Fill mesh");
-            s_VertexHelper.FillMesh(workerMesh);
-            Profiler.EndSample();
+            // Profiler.BeginSample("Fill mesh");
+            // s_VertexHelper.FillMesh(workerMesh);
+            // Profiler.EndSample();
             Profiler.BeginSample("Set mesh");
+            workerMesh.RecalculateBounds();
             canvasRenderer.SetMesh(workerMesh);
             Profiler.EndSample();
         }
 
-        protected static Mesh workerMesh
+        public Mesh workerMesh
         {
             get
             {
@@ -686,7 +686,6 @@ namespace UnityEngine.UI
                     s_Mesh = new Mesh();
                     s_Mesh.name = "Shared UI Mesh";
                     s_Mesh.hideFlags = HideFlags.HideAndDontSave;
-                    s_Mesh.MarkDynamic();
                 }
                 return s_Mesh;
             }
