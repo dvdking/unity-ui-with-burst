@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Unity.Burst;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -931,33 +929,32 @@ namespace UnityEngine.UI
     /// <summary>
     /// Update the UI renderer mesh.
     /// </summary>
-    private void OnPopulateMesh2(VertexHelper toFill)
+    protected override void OnPopulateMesh(VertexHelper toFill)
     {
-      GenerateSlicedSprite(toFill);
-      // if (activeSprite == null)
-      // {
-        // base.OnPopulateMesh(toFill);
-        // return null;
-      // }
+      if (activeSprite is null)
+      {
+        base.OnPopulateMesh(toFill);
+        return;
+      }
 
-      // switch (type)
-      // {
-        // case Type.Simple:
-          // if (!useSpriteMesh)
-            // GenerateSimpleSprite(toFill, m_PreserveAspect);
-          // else
-            // GenerateSprite(toFill, m_PreserveAspect);
-          // break;
-        // case Type.Sliced:
-          // return GenerateSlicedSprite(toFill);
-          // break;
-        // case Type.Tiled:
-          // GenerateTiledSprite(toFill);
-          // break;
-        // case Type.Filled:
-          // GenerateFilledSprite(toFill, m_PreserveAspect);
-          // break;
-      // }
+      switch (type)
+      {
+        case Type.Simple:
+          if (!useSpriteMesh)
+            GenerateSimpleSprite(toFill, m_PreserveAspect);
+          else
+            GenerateSprite(toFill, m_PreserveAspect);
+          break;
+        case Type.Sliced:
+          GenerateSlicedSprite(toFill);
+          break;
+        case Type.Tiled:
+          GenerateTiledSprite(toFill);
+          break;
+        case Type.Filled:
+          GenerateFilledSprite(toFill, m_PreserveAspect);
+          break;
+      }
 
       // return null;
     }
@@ -1035,7 +1032,6 @@ namespace UnityEngine.UI
       var uv = (activeSprite != null) ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
 
       var color32 = colorFloat;
-      vh.Clear();
       vh.AddVert(new Vector3(v.x, v.y), color32, new(uv.x, uv.y, 0, 0));
       vh.AddVert(new Vector3(v.x, v.w), color32, new(uv.x, uv.w, 0, 0));
       vh.AddVert(new Vector3(v.z, v.w), color32, new(uv.z, uv.w, 0, 0));
@@ -1066,7 +1062,6 @@ namespace UnityEngine.UI
       var drawOffset = (rectPivot - spritePivot) * drawingSize;
 
       var color32 = colorFloat;
-      vh.Clear();
 
       Vector2[] vertices = activeSprite.vertices;
       Vector2[] uvs = activeSprite.uv;
@@ -1094,34 +1089,19 @@ namespace UnityEngine.UI
     [NonSerialized]
     private bool _init = false;
 
-
-    protected sealed override void UpdateGeometry(Mesh.MeshData meshData)
-    {
-      if (s_VertexHelper == null)
-        s_VertexHelper = new(); //
-
-      s_VertexHelper.SetMeshData(meshData);
-      Profiler.BeginSample("Populate 2");
-      // var rectTransformRect = rectTransform?.rect ?? default;
-      // if (rectTransform is not null && rectTransformRect.width >= 0 && rectTransformRect.height >= 0)
-        OnPopulateMesh2(s_VertexHelper);
-
-      Profiler.EndSample();
-      // SetMesh(null);
-    }
-
     /// <summary>
     /// Generate vertices for a 9-sliced Image.
     /// </summary>
-    private unsafe JobHandle? GenerateSlicedSprite(VertexHelper toFill)
+    private void GenerateSlicedSprite(VertexHelper toFill)
     {
       if (!hasBorder)
       {
         GenerateSimpleSprite(toFill, false);
-        return null;
+        return;
       }
-
-      if (!_init)
+  
+      //todo: do not update it every frame
+      // if (!_init)
       {
         if (activeSprite is not null && !ReferenceEquals(_lastActiveSprite, activeSprite))
         {
@@ -1148,9 +1128,9 @@ namespace UnityEngine.UI
         padding /= multipliedPixelsPerUnit;
 
         s_VertScratch =
-          new NativeArray<float2>(4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+          new NativeArray<float2>(4, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
         s_UVScratch =
-          new NativeArray<float2>(4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+          new NativeArray<float2>(4, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
         s_VertScratch[0] = new(padding.x, padding.y);
         s_VertScratch[3] = new(rect.width - padding.z, rect.height - padding.w);
@@ -1169,14 +1149,10 @@ namespace UnityEngine.UI
         _init = true;
       }
 
-      toFill.Clear();
-
-      // if (toFill.m_Vertices.Length != 9 * 4)
-      {
-        toFill.Reinit(9 * 4, 9 * 6);
-        // toFill.m_Vertices.Length = 9 * 4;
-        // toFill.m_Indices.Length = 9 * 6;
-      }
+      const int quadCount = 9;
+      const int vertCount = 4;
+      const int indiciesCount = 6;
+      toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
 
       var job = new FillSlicedJob
       {
@@ -1188,85 +1164,9 @@ namespace UnityEngine.UI
       };
 
       job.Run();
-      // SetMesh(null);
-      return null;
-      // return job.Schedule();
-      // job.Run();
-      // return null;
-    }
-
-    [BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-    public struct FillSlicedJob : IJob
-    {
-      [NoAlias] 
-      [NativeDisableContainerSafetyRestriction]
-      public NativeArray<VertexHelper.VertexData> Verticies;
-
-      [NoAlias] 
-      [NativeDisableContainerSafetyRestriction]
-      public NativeArray<ushort> Indicies;
-
-      [ReadOnly] [NoAlias] public NativeArray<float2> s_VertScratch;
-
-      [NoAlias] [ReadOnly] public NativeArray<float2> s_UVScratch;
-
-      [ReadOnly] public float4 Color;
-
-      public void Execute()
-      {
-        AddQuad(0, 0, 0, 1);
-        AddQuad(1, 1, 0, 1);
-        AddQuad(2, 2, 0, 1);
-        AddQuad(3, 0, 1, 2);
-        AddQuad(4, 1, 1, 2);
-        AddQuad(5, 2, 1, 2);
-        AddQuad(6, 0, 2, 3);
-        AddQuad(7, 1, 2, 3);
-        AddQuad(8, 2, 2, 3);
-      }
-
-      [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      private void AddQuad(ushort startIndex, int y, int x, int x2)
-      {
-        int y2 = y + 1;
-        var vertIndex = (ushort)(startIndex * 4);
-        var indIndex = (ushort)(startIndex * 6);
-
-        var posMin = new float2(s_VertScratch[x].x, s_VertScratch[y].y);
-        var posMax = new float2(s_VertScratch[x2].x, s_VertScratch[y2].y);
-        var uvMin = new float2(s_UVScratch[x].x, s_UVScratch[y].y);
-        var uvMax = new float2(s_UVScratch[x2].x, s_UVScratch[y2].y);
-
-        Verticies[vertIndex + 0] = (CreateVert(new(posMin.x, posMin.y, 0), Color, new(uvMin.x, uvMin.y, 0, 0)));
-        Verticies[vertIndex + 1] = (CreateVert(new(posMin.x, posMax.y, 0), Color, new(uvMin.x, uvMax.y, 0, 0)));
-        Verticies[vertIndex + 2] = (CreateVert(new(posMax.x, posMax.y, 0), Color, new(uvMax.x, uvMax.y, 0, 0)));
-        Verticies[vertIndex + 3] = (CreateVert(new(posMax.x, posMin.y, 0), Color, new(uvMax.x, uvMin.y, 0, 0)));
-
-        Indicies[indIndex + 0] = (vertIndex);
-        Indicies[indIndex + 1] = (ushort)(vertIndex + 1);
-        Indicies[indIndex + 2] = (ushort)(vertIndex + 2);
-
-        Indicies[indIndex + 3] = (ushort)(vertIndex + 2);
-        Indicies[indIndex + 4] = (ushort)(vertIndex + 3);
-        Indicies[indIndex + 5] = vertIndex;
-      }
-
-      private VertexHelper.VertexData CreateVert(float3 pos,
-        float4 color,
-        float4 uv)
-      {
-        return new()
-        {
-          pos = pos,
-          normal = VertexHelper.s_DefaultNormal,
-          tangent = VertexHelper.s_DefaultTangent,
-          color = color,
-          uv0 = uv
-          // uv1 = new float4(uvMax.x, uvMax.y, 0, 0),
-          // uv2 = new float4(uvMax.x, uvMax.y, 0, 0),
-          // uv3 = new float4(uvMax.x, uvMax.y, 0, 0),
-        };
-      }
+      
+      s_VertScratch.Dispose();
+      s_UVScratch.Dispose();
     }
 
     /// <summary>
@@ -1307,7 +1207,6 @@ namespace UnityEngine.UI
       float yMin = border.y;
       float yMax = rect.height - border.w;
 
-      toFill.Clear();
       var clipped = uvMax;
 
       // if either width is zero we cant tile so just assume it was the full width.
@@ -1608,7 +1507,6 @@ namespace UnityEngine.UI
     /// </summary>
     unsafe void GenerateFilledSprite(VertexHelper toFill, bool preserveAspect)
     {
-      toFill.Clear();
 
       if (m_FillAmount < 0.001f)
         return;

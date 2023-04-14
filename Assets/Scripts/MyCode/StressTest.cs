@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -33,8 +34,8 @@ public class StressTest : MonoBehaviour
   IEnumerator Start()
   {
     yield return null;
-    _data = new NativeArray<MovingRect>(Count, Allocator.Persistent);
-    yield return null;
+    
+    _data = new(Count, Allocator.Persistent, NativeArrayOptions.ClearMemory);
     var go = new GameObject("CanvasGo");
     go.AddComponent<RectTransform>();
     go.transform.SetParent(transform);
@@ -44,19 +45,28 @@ public class StressTest : MonoBehaviour
     go.AddComponent<Canvas>();
     
     var lastCanvas = Instantiate(go, transform);
-    
-    for (int i = 0; i < Count; i++)
+
+    for (var i = 0; i < Count; i++)
     {
       var p = Instantiate(Prefab, lastCanvas.transform);
       _transforms.Add(p.GetComponent<RectTransform>());
       _graphics.Add(p.GetComponent<Graphic>());
-      _data[i] = new MovingRect();
 
-      if (i % 500 == 0)
+      if (i == 499)
       {
-        lastCanvas = Instantiate(go, transform);
-        yield return null;
+        // lastCanvas = Instantiate(lastCanvas, transform);
+        break;
       }
+    }
+
+    for (var i = 1; i < Count/500; i++)
+    {
+      lastCanvas = Instantiate(lastCanvas, transform);
+      var rects = lastCanvas.GetComponentsInChildren<RectTransform>();
+      _transforms.AddRange(rects.Where(x => x != lastCanvas.GetComponent<RectTransform>()));
+      
+      var graphs = lastCanvas.GetComponentsInChildren<Graphic>();
+      _graphics.AddRange(graphs.Where(x => x != lastCanvas.GetComponent<Graphic>()));
     }
 
     ChangeTimer = ChangeTimerDurstion;
@@ -67,10 +77,9 @@ public class StressTest : MonoBehaviour
     _data.Dispose();
   }
 
-  // Update is called once per frame
-  unsafe void Update()
+  void Update()
   {
-    if (_data == default)
+    if (_data == default || _transforms.Count != _data.Length)
       return;
     var updateJob = new UpdateJob()
     {

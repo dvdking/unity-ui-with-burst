@@ -1439,8 +1439,8 @@ namespace UnityEngine.UI
             {
                 if (m_CachedInputRenderer != null)
                 {
-                    using (var helper = new VertexHelper())
-                        helper.FillMesh(mesh);
+                    // using (var helper = new VertexHelper())
+                        // helper.FillMesh(mesh);
 
                     m_CachedInputRenderer.SetMesh(mesh);
                 }
@@ -2795,22 +2795,22 @@ namespace UnityEngine.UI
 
         private void OnFillVBO(Mesh vbo)
         {
-            using (var helper = new VertexHelper())
-            {
-                if (!isFocused)
-                {
-                    helper.FillMesh(vbo);
-                    return;
-                }
+            // using (var helper = new VertexHelper())
+            // {
+                // if (!isFocused)
+                // {
+                    // helper.FillMesh(vbo);
+                    // return;
+                // }
 
-                Vector2 roundingOffset = m_TextComponent.PixelAdjustPoint(Vector2.zero);
-                if (!hasSelection)
-                    GenerateCaret(helper, roundingOffset);
-                else
-                    GenerateHighlight(helper, roundingOffset);
+                // Vector2 roundingOffset = m_TextComponent.PixelAdjustPoint(Vector2.zero);
+                // if (!hasSelection)
+                    // GenerateCaret(helper, roundingOffset);
+                // else
+                    // GenerateHighlight(helper, roundingOffset);
 
-                helper.FillMesh(vbo);
-            }
+                // helper.FillMesh(vbo);
+            // }
         }
 
         private void GenerateCaret(VertexHelper vbo, Vector2 roundingOffset)

@@ -133,7 +133,7 @@ namespace UnityEngine.UI
             }
         }
 
-        protected override JobHandle? OnPopulateMesh(VertexHelper vh)
+        protected override void OnPopulateMesh(VertexHelper vh)
         {
             // Texture tex = mainTexture;
             // vh.Clear();
@@ -154,7 +154,6 @@ namespace UnityEngine.UI
                     // vh.AddTriangle(2, 3, 0);
                 // }
             // }
-            return null;
         }
 
         protected override void OnDidApplyAnimationProperties()

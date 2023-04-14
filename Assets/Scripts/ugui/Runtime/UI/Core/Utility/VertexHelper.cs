@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using JetBrains.Annotations;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine.Pool;
@@ -79,21 +80,12 @@ namespace UnityEngine.UI
       _data = meshData;
     }
 
+    public void Clear()
+    {
+      Reinit(0, 0);
+    }
     public void Reinit(int sizeVert, int sizeInd)
     {
-      // if (!m_Lm_Vertices.LengthistsInitalized)
-      _sizeVert = 0;
-      _sizeInd = 0;
-      
-      // _dataArray = Mesh.AllocateWritableMeshData(1);
-      // _data = _dataArray[0];
-
-      // if (_sizeVert == sizeVert && _sizeInd == sizeInd)
-        // return;
-                                         
-      _sizeVert = sizeVert;
-      _sizeInd = sizeInd;
-
       _currentIndicesIndex = 0;
       _currentVertIndex = 0;
 
@@ -101,17 +93,6 @@ namespace UnityEngine.UI
       m_Vertices = _data.GetVertexData<VertexData>();
       _data.SetIndexBufferParams(sizeInd, IndexFormat.UInt16);
       m_Indices = _data.GetIndexData<ushort>();
-              // One sub-mesh with all the indices.
-      // m_Positions = new(Allocator.Persistent);
-      // m_Colors = new(Allocator.Persistent);
-      // m_Uv0S = new(Allocator.Persistent);
-      // m_Uv1S = new(Allocator.Persistent);
-      // m_Uv2S = new(Allocator.Persistent);
-      // m_Uv3S = new(Allocator.Persistent);
-      // m_Normals = new(Allocator.Persistent);
-      // m_Tangents = new(Allocator.Persistent);
-      // m_Vertices = new(Allocator.Persistent);
-      // m_Indices = new(Allocator.Persistent);
       m_ListsInitalized = true;
     }
 
@@ -131,27 +112,6 @@ namespace UnityEngine.UI
     }
 
     /// <summary>
-    /// Clear all vertices from the stream.
-    /// </summary>
-    public void Clear()
-    {
-      // Only clear if we have our lists created.
-      if (m_ListsInitalized)
-      {
-        // m_Positions.Clear();
-        // m_Colors.Clear();
-        // m_Uv0S.Clear();
-        // m_Uv1S.Clear();
-        // m_Uv2S.Clear();
-        // m_Uv3S.Clear();
-        // m_Normals.Clear();
-        // m_Tangents.Clear();
-        // m_Vertices.Clear();
-        // m_Indices.Clear();
-      }
-    }
-
-    /// <summary>
     /// Current number of vertices in the buffer.
     /// </summary>
     public int currentVertCount => _currentVertIndex;
@@ -161,7 +121,7 @@ namespace UnityEngine.UI
     /// </summary>
     public int currentIndexCount => _currentIndicesIndex;
 
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct VertexData
     {
       public float3 pos;
@@ -169,8 +129,12 @@ namespace UnityEngine.UI
       public float4 tangent;
       public float4 color;
       public float4 uv0;
+      
+      [UsedImplicitly]
       public float4 uv1;
+      [UsedImplicitly]
       public float4 uv2;
+      [UsedImplicitly]
       public float4 uv3;
     }
 
@@ -181,20 +145,6 @@ namespace UnityEngine.UI
     private Mesh.MeshData _data;
 
     private NativeList<VertexAttributeDescriptor> _arr;
-
-    /// <summary>
-    /// Fill the given mesh with the stream data.
-    /// </summary>
-    public unsafe void FillMesh(Mesh mesh)
-    {
-      if (m_Vertices.Length >= 65000)
-        throw new ArgumentException("Mesh can not have more than 65000 vertices");
-
-      Profiler.BeginSample("Set vertecies");
-
-      _data.subMeshCount = 1;
-      _data.SetSubMesh(0, new(0, m_Indices.Length));
-    }
 
     /// <summary>
     /// Add a single vertex to the stream.
@@ -217,7 +167,7 @@ namespace UnityEngine.UI
       float3 normal,
       float4 tangent)
     {
-      m_Vertices[_currentVertIndex++]= (new()
+      m_Vertices[_currentVertIndex++]= new()
       {
         pos = position,
         normal = normal,
@@ -227,7 +177,7 @@ namespace UnityEngine.UI
         // uv1 = uv1,
         // uv2 = uv2,
         // uv3 = uv3,
-      });
+      };
     }
 
     /// <summary>

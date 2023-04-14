@@ -658,9 +658,8 @@ namespace UnityEngine.UI
         }
 
         readonly UIVertex[] m_TempVerts = new UIVertex[4];
-        protected override JobHandle? OnPopulateMesh(VertexHelper toFill)
+        protected override void OnPopulateMesh(VertexHelper toFill)
         {
-            return null;
             // if (font == null)
             // return;
 
