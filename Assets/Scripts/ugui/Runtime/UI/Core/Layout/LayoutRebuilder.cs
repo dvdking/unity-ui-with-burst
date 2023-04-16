@@ -43,11 +43,6 @@ namespace UnityEngine.UI
             MarkLayoutForRebuild(driven);
         }
 
-        public void SetMesh(JobHandle? handle)
-        {
-            return;
-        }
-
         public void SetMesh()
         {
         }

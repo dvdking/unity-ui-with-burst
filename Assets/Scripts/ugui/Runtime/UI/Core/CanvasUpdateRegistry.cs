@@ -252,7 +252,7 @@ namespace UnityEngine.UI
         }
 
 
-        Profiler.BeginSample("Final set meshes to canvas renderer");
+        // Profiler.BeginSample("Final set meshes to canvas renderer");
         _meshes ??= new();
         _meshes.Clear();
         if (i == (int)CanvasUpdate.PreRender)
@@ -264,6 +264,7 @@ namespace UnityEngine.UI
 
             var meshData = _dataArray[k];
             meshData.subMeshCount = 1;
+
             meshData.SetSubMesh(0, new(0, element.s_VertexHelper.m_Indices.Length));
           }
 
@@ -277,7 +278,7 @@ namespace UnityEngine.UI
 
           _meshes.Clear();
         }
-        Profiler.EndSample();
+        // Profiler.EndSample();
 
 
         UnityEngine.Profiling.Profiler.EndSample();

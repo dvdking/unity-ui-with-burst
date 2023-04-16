@@ -24,6 +24,7 @@ namespace UnityEngine.UI
     [NoAlias] [ReadOnly] public NativeArray<float2> s_UVScratch;
 
     [ReadOnly] public float4 Color;
+    [ReadOnly] public bool FillCenter;
 
     public void Execute()
     {
@@ -31,14 +32,24 @@ namespace UnityEngine.UI
       AddQuad(1, 1, 0, 1);
       AddQuad(2, 2, 0, 1);
       AddQuad(3, 0, 1, 2);
-      AddQuad(4, 1, 1, 2);
-      AddQuad(5, 2, 1, 2);
-      AddQuad(6, 0, 2, 3);
-      AddQuad(7, 1, 2, 3);
-      AddQuad(8, 2, 2, 3);
+      if (FillCenter)
+      {
+        AddQuad(4, 1, 1, 2);
+        AddQuad(5, 2, 1, 2);
+        AddQuad(6, 0, 2, 3);
+        AddQuad(7, 1, 2, 3);
+        AddQuad(8, 2, 2, 3);
+      }
+      else
+      {
+        AddQuad(4, 2, 1, 2);
+        AddQuad(5, 0, 2, 3);
+        AddQuad(6, 1, 2, 3);
+        AddQuad(7, 2, 2, 3);
+      }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    // [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void AddQuad(ushort startIndex, int y, int x, int x2)
     {
       int y2 = y + 1;

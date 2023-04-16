@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using JetBrains.Annotations;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine.Pool;
 using UnityEngine.Profiling;
@@ -102,13 +103,7 @@ namespace UnityEngine.UI
     public void Dispose()
     {
       _arr.Dispose();
-      if (m_ListsInitalized)
-      {
-        m_Vertices.Dispose();
-        m_Indices.Dispose();
-
-        m_ListsInitalized = false;
-      }
+      m_ListsInitalized = false;
     }
 
     /// <summary>

@@ -49,8 +49,7 @@ namespace UnityEngine.UI
             if (c == null || graphic == null)
                 return;
 
-            IndexedSet<Graphic> graphics;
-            instance.m_Graphics.TryGetValue(c, out graphics);
+            instance.m_Graphics.TryGetValue(c, out var graphics);
 
             if (graphics != null)
             {

@@ -658,56 +658,57 @@ namespace UnityEngine.UI
         }
 
         readonly UIVertex[] m_TempVerts = new UIVertex[4];
+
         protected override void OnPopulateMesh(VertexHelper toFill)
         {
-            // if (font == null)
-            // return;
+            if (font == null)
+                return;
 
-            // m_DisableFontTextureRebuiltCallback = true;
+            m_DisableFontTextureRebuiltCallback = true;
 
-            // Vector2 extents = rectTransform.rect.size;
+            Vector2 extents = rectTransform.rect.size;
 
-            // var settings = GetGenerationSettings(extents);
-            // cachedTextGenerator.PopulateWithErrors(text, settings, gameObject);
-            // IList<UIVertex> verts = cachedTextGenerator.verts;
-            // float unitsPerPixel = 1 / pixelsPerUnit;
-            // int vertCount = verts.Count;
+            var settings = GetGenerationSettings(extents);
+            cachedTextGenerator.PopulateWithErrors(text, settings, gameObject);
+            IList<UIVertex> verts = cachedTextGenerator.verts;
+            float unitsPerPixel = 1 / pixelsPerUnit;
+            int vertCount = verts.Count;
 
-            // if (vertCount <= 0)
-            // {
-            // toFill.Clear();
-            // return;
-            // }
+            if (vertCount <= 0)
+            {
+                toFill.Clear();
+                return;
+            }
 
-            // Vector2 roundingOffset = new Vector2(verts[0].position.x, verts[0].position.y) * unitsPerPixel;
-            // roundingOffset = PixelAdjustPoint(roundingOffset) - roundingOffset;
-            // toFill.Clear();
-            // if (roundingOffset != Vector2.zero)
-            // {
-            // for (int i = 0; i < vertCount; ++i)
-            // {
-            // int tempVertsIndex = i & 3;
-            // m_TempVerts[tempVertsIndex] = verts[i];
-            // m_TempVerts[tempVertsIndex].position *= unitsPerPixel;
-            // m_TempVerts[tempVertsIndex].position.x += roundingOffset.x;
-            // m_TempVerts[tempVertsIndex].position.y += roundingOffset.y;
-            // if (tempVertsIndex == 3)
-            // toFill.AddUIVertexQuad(m_TempVerts);
-            // }
-            // }
-            // else
-            // {
-            // for (int i = 0; i < vertCount; ++i)
-            // {
-            // int tempVertsIndex = i & 3;
-            // m_TempVerts[tempVertsIndex] = verts[i];
-            // m_TempVerts[tempVertsIndex].position *= unitsPerPixel;
-            // if (tempVertsIndex == 3)
-            // toFill.AddUIVertexQuad(m_TempVerts);
-            // }
-            // }
+            Vector2 roundingOffset = new Vector2(verts[0].position.x, verts[0].position.y) * unitsPerPixel;
+            roundingOffset = PixelAdjustPoint(roundingOffset) - roundingOffset;
+            toFill.Clear();
+            if (roundingOffset != Vector2.zero)
+            {
+                for (int i = 0; i < vertCount; ++i)
+                {
+                    int tempVertsIndex = i & 3;
+                    m_TempVerts[tempVertsIndex] = verts[i];
+                    m_TempVerts[tempVertsIndex].position *= unitsPerPixel;
+                    m_TempVerts[tempVertsIndex].position.x += roundingOffset.x;
+                    m_TempVerts[tempVertsIndex].position.y += roundingOffset.y;
+                    if (tempVertsIndex == 3)
+                        toFill.AddUIVertexQuad(m_TempVerts);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < vertCount; ++i)
+                {
+                    int tempVertsIndex = i & 3;
+                    m_TempVerts[tempVertsIndex] = verts[i];
+                    m_TempVerts[tempVertsIndex].position *= unitsPerPixel;
+                    if (tempVertsIndex == 3)
+                        toFill.AddUIVertexQuad(m_TempVerts);
+                }
+            }
 
-            // m_DisableFontTextureRebuiltCallback = false;
+            m_DisableFontTextureRebuiltCallback = false;
         }
 
         public virtual void CalculateLayoutInputHorizontal() {}

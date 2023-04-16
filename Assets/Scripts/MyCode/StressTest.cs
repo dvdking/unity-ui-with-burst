@@ -16,6 +16,7 @@ public class StressTest : MonoBehaviour
   public int Count = 1000;
   public float ChangeTimerDurstion = .5f;
   public Text Dt;
+  public Transform rootChild;
   
   public float ChangeTimer;
 
@@ -44,7 +45,7 @@ public class StressTest : MonoBehaviour
     
     go.AddComponent<Canvas>();
     
-    var lastCanvas = Instantiate(go, transform);
+    var lastCanvas = Instantiate(go, rootChild);
 
     for (var i = 0; i < Count; i++)
     {
@@ -58,7 +59,7 @@ public class StressTest : MonoBehaviour
 
     for (var i = 1; i < Count/500; i++)
     {
-      lastCanvas = Instantiate(lastCanvas, transform);
+      lastCanvas = Instantiate(lastCanvas, rootChild);
       var rects = lastCanvas.GetComponentsInChildren<RectTransform>();
       _transforms.AddRange(rects.Where(x => x != lastCanvas.GetComponent<RectTransform>()));
       

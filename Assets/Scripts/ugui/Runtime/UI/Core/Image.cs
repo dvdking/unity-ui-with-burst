@@ -1154,7 +1154,10 @@ namespace UnityEngine.UI
       const int quadCount = 9;
       const int vertCount = 4;
       const int indiciesCount = 6;
-      toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+      if (fillCenter)
+        toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+      else
+        toFill.Reinit((quadCount - 1) * vertCount, (quadCount - 1) * indiciesCount);
 
       var job = new FillSlicedSpriteJob
       {
@@ -1162,7 +1165,8 @@ namespace UnityEngine.UI
         Indicies = toFill.m_Indices,
         Color = colorFloat,
         s_VertScratch = s_VertScratch,
-        s_UVScratch = s_UVScratch
+        s_UVScratch = s_UVScratch,
+        FillCenter = fillCenter
       };
 
       job.Run();
@@ -1240,256 +1244,11 @@ namespace UnityEngine.UI
       };
 
       job.Run();
+      
+      if(activeSprite.texture.wrapMode != TextureWrapMode.Repeat)
+        Debug.LogError($"Texture {activeSprite.texture.name} is not set to repeat mode. This will cause issues with tiling.");
+      
       return;
-
-      if (activeSprite != null && (hasBorder || activeSprite.packed
-                                             || activeSprite.texture != null && activeSprite.texture.wrapMode
-                                             != TextureWrapMode.Repeat))
-      {
-        // Sprite has border, or is not in repeat mode, or cannot be repeated because of packing.
-        // We cannot use texture tiling so we will generate a mesh of quads to tile the texture.
-
-        // Evaluate how many vertices we will generate. Limit this number to something sane,
-        // especially since meshes can not have more than 65000 vertices.
-
-        long nTilesW = 0;
-        long nTilesH = 0;
-        if (m_FillCenter)
-        {
-          nTilesW = (long)Math.Ceiling((xMax - xMin) / tileWidth);
-          nTilesH = (long)Math.Ceiling((yMax - yMin) / tileHeight);
-
-          double nVertices = 0;
-          if (hasBorder)
-          {
-            nVertices = (nTilesW + 2.0) * (nTilesH + 2.0) * 4.0; // 4 vertices per tile
-          }
-          else
-          {
-            nVertices = nTilesW * nTilesH * 4.0; // 4 vertices per tile
-          }
-
-          if (nVertices > 65000.0)
-          {
-            Debug.LogError("Too many sprite tiles on Image \"" + name
-                                                               + "\". The tile size will be increased. To remove the limit on the number of tiles, set the Wrap mode to Repeat in the Image Import Settings",
-              this);
-
-            double maxTiles = 65000.0 / 4.0; // Max number of vertices is 65000; 4 vertices per tile.
-            double imageRatio;
-            if (hasBorder)
-            {
-              imageRatio = (nTilesW + 2.0) / (nTilesH + 2.0);
-            }
-            else
-            {
-              imageRatio = (double)nTilesW / nTilesH;
-            }
-
-            double targetTilesW = Math.Sqrt(maxTiles / imageRatio);
-            double targetTilesH = targetTilesW * imageRatio;
-            if (hasBorder)
-            {
-              targetTilesW -= 2;
-              targetTilesH -= 2;
-            }
-
-            nTilesW = (long)Math.Floor(targetTilesW);
-            nTilesH = (long)Math.Floor(targetTilesH);
-            tileWidth = (xMax - xMin) / nTilesW;
-            tileHeight = (yMax - yMin) / nTilesH;
-          }
-        }
-        else
-        {
-          if (hasBorder)
-          {
-            // Texture on the border is repeated only in one direction.
-            nTilesW = (long)Math.Ceiling((xMax - xMin) / tileWidth);
-            nTilesH = (long)Math.Ceiling((yMax - yMin) / tileHeight);
-            double nVertices = (nTilesH + nTilesW + 2.0 /*corners*/) * 2.0 /*sides*/ * 4.0 /*vertices per tile*/;
-            if (nVertices > 65000.0)
-            {
-              Debug.LogError("Too many sprite tiles on Image \"" + name
-                                                                 + "\". The tile size will be increased. To remove the limit on the number of tiles, set the Wrap mode to Repeat in the Image Import Settings",
-                this);
-
-              double maxTiles = 65000.0 / 4.0; // Max number of vertices is 65000; 4 vertices per tile.
-              double imageRatio = (double)nTilesW / nTilesH;
-              double targetTilesW = (maxTiles - 4 /*corners*/) / (2 * (1.0 + imageRatio));
-              double targetTilesH = targetTilesW * imageRatio;
-
-              nTilesW = (long)Math.Floor(targetTilesW);
-              nTilesH = (long)Math.Floor(targetTilesH);
-              tileWidth = (xMax - xMin) / nTilesW;
-              tileHeight = (yMax - yMin) / nTilesH;
-            }
-          }
-          else
-          {
-            nTilesH = nTilesW = 0;
-          }
-        }
-
-        if (m_FillCenter)
-        {
-          // TODO: we could share vertices between quads. If vertex sharing is implemented. update the computation for the number of vertices accordingly.
-          for (long j = 0; j < nTilesH; j++)
-          {
-            float y1 = yMin + j * tileHeight;
-            float y2 = yMin + (j + 1) * tileHeight;
-            if (y2 > yMax)
-            {
-              clipped.y = uvMin.y + (uvMax.y - uvMin.y) * (yMax - y1) / (y2 - y1);
-              y2 = yMax;
-            }
-
-            clipped.x = uvMax.x;
-            for (long i = 0; i < nTilesW; i++)
-            {
-              float x1 = xMin + i * tileWidth;
-              float x2 = xMin + (i + 1) * tileWidth;
-              if (x2 > xMax)
-              {
-                clipped.x = uvMin.x + (uvMax.x - uvMin.x) * (xMax - x1) / (x2 - x1);
-                x2 = xMax;
-              }
-
-              AddQuad(toFill,
-                new Vector2(x1, y1) + rect.position,
-                new Vector2(x2, y2) + rect.position,
-                colorFloat,
-                uvMin,
-                clipped);
-            }
-          }
-        }
-
-        if (hasBorder)
-        {
-          clipped = uvMax;
-          for (long j = 0; j < nTilesH; j++)
-          {
-            float y1 = yMin + j * tileHeight;
-            float y2 = yMin + (j + 1) * tileHeight;
-            if (y2 > yMax)
-            {
-              clipped.y = uvMin.y + (uvMax.y - uvMin.y) * (yMax - y1) / (y2 - y1);
-              y2 = yMax;
-            }
-
-            AddQuad(toFill,
-              new Vector2(0, y1) + rect.position,
-              new Vector2(xMin, y2) + rect.position,
-              colorFloat,
-              new Vector2(outer.x, uvMin.y),
-              new Vector2(uvMin.x, clipped.y));
-            AddQuad(toFill,
-              new Vector2(xMax, y1) + rect.position,
-              new Vector2(rect.width, y2) + rect.position,
-              colorFloat,
-              new Vector2(uvMax.x, uvMin.y),
-              new Vector2(outer.z, clipped.y));
-          }
-
-          // Bottom and top tiled border
-          clipped = uvMax;
-          for (long i = 0; i < nTilesW; i++)
-          {
-            float x1 = xMin + i * tileWidth;
-            float x2 = xMin + (i + 1) * tileWidth;
-            if (x2 > xMax)
-            {
-              clipped.x = uvMin.x + (uvMax.x - uvMin.x) * (xMax - x1) / (x2 - x1);
-              x2 = xMax;
-            }
-
-            AddQuad(toFill,
-              new Vector2(x1, 0) + rect.position,
-              new Vector2(x2, yMin) + rect.position,
-              colorFloat,
-              new Vector2(uvMin.x, outer.y),
-              new Vector2(clipped.x, uvMin.y));
-            AddQuad(toFill,
-              new Vector2(x1, yMax) + rect.position,
-              new Vector2(x2, rect.height) + rect.position,
-              colorFloat,
-              new Vector2(uvMin.x, uvMax.y),
-              new Vector2(clipped.x, outer.w));
-          }
-
-          // Corners
-          AddQuad(toFill,
-            new Vector2(0, 0) + rect.position,
-            new Vector2(xMin, yMin) + rect.position,
-            colorFloat,
-            new Vector2(outer.x, outer.y),
-            new Vector2(uvMin.x, uvMin.y));
-          AddQuad(toFill,
-            new Vector2(xMax, 0) + rect.position,
-            new Vector2(rect.width, yMin) + rect.position,
-            colorFloat,
-            new Vector2(uvMax.x, outer.y),
-            new Vector2(outer.z, uvMin.y));
-          AddQuad(toFill,
-            new Vector2(0, yMax) + rect.position,
-            new Vector2(xMin, rect.height) + rect.position,
-            colorFloat,
-            new Vector2(outer.x, uvMax.y),
-            new Vector2(uvMin.x, outer.w));
-          AddQuad(toFill,
-            new Vector2(xMax, yMax) + rect.position,
-            new Vector2(rect.width, rect.height) + rect.position,
-            colorFloat,
-            new Vector2(uvMax.x, uvMax.y),
-            new Vector2(outer.z, outer.w));
-        }
-      }
-      else
-      {
-        // Texture has no border, is in repeat mode and not packed. Use texture tiling.
-        Vector2 uvScale = new Vector2((xMax - xMin) / tileWidth, (yMax - yMin) / tileHeight);
-
-        if (m_FillCenter)
-        {
-          AddQuad(toFill,
-            new Vector2(xMin, yMin) + rect.position,
-            new Vector2(xMax, yMax) + rect.position,
-            colorFloat,
-            Vector2.Scale(uvMin, uvScale),
-            Vector2.Scale(uvMax, uvScale));
-        }
-      }
-    }
-
-    static void AddQuad(VertexHelper vertexHelper, float3[] quadPositions, float4 color, float4[] quadUVs)
-    {
-      var startIndex = (ushort)vertexHelper.currentVertCount;
-
-      for (int i = 0; i < 4; ++i)
-        vertexHelper.AddVert(quadPositions[i], color, quadUVs[i]);
-
-      // vertexHelper.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
-      // vertexHelper.AddTriangle(startIndex + 2, startIndex + 3, startIndex);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static void AddQuad(VertexHelper vertexHelper,
-      float2 posMin,
-      float2 posMax,
-      float4 color,
-      float2 uvMin,
-      float2 uvMax)
-    {
-      uint startIndex = (uint)vertexHelper.currentVertCount;
-
-      vertexHelper.AddVert(new(posMin.x, posMin.y, 0), color, new(uvMin.x, uvMin.y, 0, 0));
-      vertexHelper.AddVert(new(posMin.x, posMax.y, 0), color, new(uvMin.x, uvMax.y, 0, 0));
-      vertexHelper.AddVert(new(posMax.x, posMax.y, 0), color, new(uvMax.x, uvMax.y, 0, 0));
-      vertexHelper.AddVert(new(posMax.x, posMin.y, 0), color, new(uvMax.x, uvMin.y, 0, 0));
-
-      // vertexHelper.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
-      // vertexHelper.AddTriangle(startIndex + 2, startIndex + 3, startIndex);
     }
 
     private float4 GetAdjustedBorders(float4 border, Rect adjustedRect)
@@ -1525,52 +1284,49 @@ namespace UnityEngine.UI
       return border;
     }
 
-    // static readonly float3[] s_Xy = new float3[4];
-    // static readonly float4[] s_Uv = new float4[4];
-
     /// <summary>
     /// Generate vertices for a filled Image.
     /// </summary>
-    unsafe void GenerateFilledSprite(VertexHelper toFill, bool preserveAspect)
+    void GenerateFilledSprite(VertexHelper toFill, bool preserveAspect)
     {
-      if (m_FillAmount < 0.001f)
-        return;
-
-      var v = GetDrawingDimensions(preserveAspect);
-      var outer = activeSprite != null ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
-      // UIVertex uiv = UIVertex.simpleVert;
-      // uiv.color = color;
 
       const int quadCount = 1;
       const int vertCount = 4;
       const int indiciesCount = 6;
-      if (m_FillAmount < 1f && m_FillMethod is not FillMethod.Horizontal and not FillMethod.Vertical)
+
+      switch (m_FillAmount)
       {
-        switch (m_FillMethod)
-        {
-          case FillMethod.Radial90:
-            toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
-            break;
-          case FillMethod.Radial180:
+        case < 0.001f:
+          toFill.Clear();
+          return;
+        case < 1f when m_FillMethod is not FillMethod.Horizontal and not FillMethod.Vertical:
+          switch (m_FillMethod)
           {
-            const int quadCountRadial180 = 2;
-            toFill.Reinit(quadCountRadial180 * vertCount, quadCountRadial180 * indiciesCount);
-            break;
+            case FillMethod.Radial90:
+              toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+              break;
+            case FillMethod.Radial180:
+            {
+              const int quadCountRadial180 = 2;
+              toFill.Reinit(quadCountRadial180 * vertCount, quadCountRadial180 * indiciesCount);
+              break;
+            }
+            case FillMethod.Radial360:
+            {
+              const int quadCountRadial360 = 4;
+              toFill.Reinit(quadCountRadial360 * vertCount, quadCountRadial360 * indiciesCount);
+              break;
+            }
           }
-          case FillMethod.Radial360:
-          {
-            const int quadCountRadial360 = 4;
-            toFill.Reinit(quadCountRadial360 * vertCount, quadCountRadial360 * indiciesCount);
-            break;
-          }
-        }
-      }
-      else
-      {
-        toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+
+          break;
+        default:
+          toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+          break;
       }
 
-
+      var v = GetDrawingDimensions(preserveAspect);
+      var outer = activeSprite != null ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
       var job = new FillFilledSpriteJob
       {
         Dimensions = v,
@@ -1585,302 +1341,6 @@ namespace UnityEngine.UI
       };
 
       job.Run();
-
-      return;
-      float tx0 = outer.x;
-      float ty0 = outer.y;
-      float tx1 = outer.z;
-      float ty1 = outer.w;
-      // Horizontal and vertical filled sprites are simple -- just end the Image prematurely
-      if (m_FillMethod is FillMethod.Horizontal or FillMethod.Vertical)
-      {
-        if (fillMethod == FillMethod.Horizontal)
-        {
-          float fill = (tx1 - tx0) * m_FillAmount;
-
-          if (m_FillOrigin == 1)
-          {
-            v.x = v.z - (v.z - v.x) * m_FillAmount;
-            tx0 = tx1 - fill;
-          }
-          else
-          {
-            v.z = v.x + (v.z - v.x) * m_FillAmount;
-            tx1 = tx0 + fill;
-          }
-        }
-        else if (fillMethod == FillMethod.Vertical)
-        {
-          float fill = (ty1 - ty0) * m_FillAmount;
-
-          if (m_FillOrigin == 1)
-          {
-            v.y = v.w - (v.w - v.y) * m_FillAmount;
-            ty0 = ty1 - fill;
-          }
-          else
-          {
-            v.w = v.y + (v.w - v.y) * m_FillAmount;
-            ty1 = ty0 + fill;
-          }
-        }
-      }
-
-      var s_Xy = stackalloc float3[4];
-      var s_Uv = stackalloc float4[4];
-
-      s_Xy[0] = new(v.x, v.y, 0);
-      s_Xy[1] = new(v.x, v.w, 0);
-      s_Xy[2] = new(v.z, v.w, 0);
-      s_Xy[3] = new(v.z, v.y, 0);
-
-      s_Uv[0] = new(tx0, ty0, 0, 0);
-      s_Uv[1] = new(tx0, ty1, 0, 0);
-      s_Uv[2] = new(tx1, ty1, 0, 0);
-      s_Uv[3] = new(tx1, ty0, 0, 0);
-
-      {
-        if (m_FillAmount < 1f && m_FillMethod != FillMethod.Horizontal && m_FillMethod != FillMethod.Vertical)
-        {
-          if (fillMethod == FillMethod.Radial90)
-          {
-            // if (RadialCut(s_Xy, s_Uv, m_FillAmount, m_FillClockwise, m_FillOrigin))
-            // AddQuad(toFill, s_Xy, colorFloat, s_Uv);
-          }
-          else if (fillMethod == FillMethod.Radial180)
-          {
-            for (int side = 0; side < 2; ++side)
-            {
-              float fx0, fx1, fy0, fy1;
-              int even = m_FillOrigin > 1 ? 1 : 0;
-
-              if (m_FillOrigin == 0 || m_FillOrigin == 2)
-              {
-                fy0 = 0f;
-                fy1 = 1f;
-                if (side == even)
-                {
-                  fx0 = 0f;
-                  fx1 = 0.5f;
-                }
-                else
-                {
-                  fx0 = 0.5f;
-                  fx1 = 1f;
-                }
-              }
-              else
-              {
-                fx0 = 0f;
-                fx1 = 1f;
-                if (side == even)
-                {
-                  fy0 = 0.5f;
-                  fy1 = 1f;
-                }
-                else
-                {
-                  fy0 = 0f;
-                  fy1 = 0.5f;
-                }
-              }
-
-              s_Xy[0].x = Mathf.Lerp(v.x, v.z, fx0);
-              s_Xy[1].x = s_Xy[0].x;
-              s_Xy[2].x = Mathf.Lerp(v.x, v.z, fx1);
-              s_Xy[3].x = s_Xy[2].x;
-
-              s_Xy[0].y = Mathf.Lerp(v.y, v.w, fy0);
-              s_Xy[1].y = Mathf.Lerp(v.y, v.w, fy1);
-              s_Xy[2].y = s_Xy[1].y;
-              s_Xy[3].y = s_Xy[0].y;
-
-              s_Uv[0].x = Mathf.Lerp(tx0, tx1, fx0);
-              s_Uv[1].x = s_Uv[0].x;
-              s_Uv[2].x = Mathf.Lerp(tx0, tx1, fx1);
-              s_Uv[3].x = s_Uv[2].x;
-
-              s_Uv[0].y = Mathf.Lerp(ty0, ty1, fy0);
-              s_Uv[1].y = Mathf.Lerp(ty0, ty1, fy1);
-              s_Uv[2].y = s_Uv[1].y;
-              s_Uv[3].y = s_Uv[0].y;
-
-              float val = m_FillClockwise ? fillAmount * 2f - side : m_FillAmount * 2f - (1 - side);
-
-              // if (RadialCut(s_Xy, s_Uv, Mathf.Clamp01(val), m_FillClockwise, ((side + m_FillOrigin + 3) % 4)))
-              // {
-              // AddQuad(toFill, s_Xy, colorFloat, s_Uv);
-              // }
-            }
-          }
-          else if (fillMethod == FillMethod.Radial360)
-          {
-            for (int corner = 0; corner < 4; ++corner)
-            {
-              float fx0, fx1, fy0, fy1;
-
-              if (corner < 2)
-              {
-                fx0 = 0f;
-                fx1 = 0.5f;
-              }
-              else
-              {
-                fx0 = 0.5f;
-                fx1 = 1f;
-              }
-
-              if (corner is 0 or 3)
-              {
-                fy0 = 0f;
-                fy1 = 0.5f;
-              }
-              else
-              {
-                fy0 = 0.5f;
-                fy1 = 1f;
-              }
-
-              s_Xy[0].x = Mathf.Lerp(v.x, v.z, fx0);
-              s_Xy[1].x = s_Xy[0].x;
-              s_Xy[2].x = Mathf.Lerp(v.x, v.z, fx1);
-              s_Xy[3].x = s_Xy[2].x;
-
-              s_Xy[0].y = Mathf.Lerp(v.y, v.w, fy0);
-              s_Xy[1].y = Mathf.Lerp(v.y, v.w, fy1);
-              s_Xy[2].y = s_Xy[1].y;
-              s_Xy[3].y = s_Xy[0].y;
-
-              s_Uv[0].x = Mathf.Lerp(tx0, tx1, fx0);
-              s_Uv[1].x = s_Uv[0].x;
-              s_Uv[2].x = Mathf.Lerp(tx0, tx1, fx1);
-              s_Uv[3].x = s_Uv[2].x;
-
-              s_Uv[0].y = Mathf.Lerp(ty0, ty1, fy0);
-              s_Uv[1].y = Mathf.Lerp(ty0, ty1, fy1);
-              s_Uv[2].y = s_Uv[1].y;
-              s_Uv[3].y = s_Uv[0].y;
-
-              float val = m_FillClockwise
-                ? m_FillAmount * 4f - ((corner + m_FillOrigin) % 4)
-                : m_FillAmount * 4f - (3 - ((corner + m_FillOrigin) % 4));
-
-              // if (RadialCut(s_Xy, s_Uv, Mathf.Clamp01(val), m_FillClockwise, ((corner + 2) % 4)))
-              // AddQuad(toFill, s_Xy, colorFloat, s_Uv);
-            }
-          }
-        }
-        else
-        {
-          // AddQuad(toFill, s_Xy, colorFloat, s_Uv);
-        }
-      }
-    }
-
-    /// <summary>
-    /// Adjust the specified quad, making it be radially filled instead.
-    /// </summary>
-    static bool RadialCut(float3[] xy, float4[] uv, float fill, bool invert, int corner)
-    {
-      // Nothing to fill
-      if (fill < 0.001f) return false;
-
-      // Even corners invert the fill direction
-      if ((corner & 1) == 1) invert = !invert;
-
-      // Nothing to adjust
-      if (!invert && fill > 0.999f) return true;
-
-      // Convert 0-1 value into 0 to 90 degrees angle in radians
-      float angle = Mathf.Clamp01(fill);
-      if (invert) angle = 1f - angle;
-      angle *= 90f * Mathf.Deg2Rad;
-
-      // Calculate the effective X and Y factors
-      float cos = Mathf.Cos(angle);
-      float sin = Mathf.Sin(angle);
-
-      RadialCut(xy, cos, sin, invert, corner);
-      // RadialCut(uv, cos, sin, invert, corner);
-      return true;
-    }
-
-    /// <summary>
-    /// Adjust the specified quad, making it be radially filled instead.
-    /// </summary>
-    static void RadialCut(float3[] xy, float cos, float sin, bool invert, int corner)
-    {
-      int i0 = corner;
-      int i1 = ((corner + 1) % 4);
-      int i2 = ((corner + 2) % 4);
-      int i3 = ((corner + 3) % 4);
-
-      if ((corner & 1) == 1)
-      {
-        if (sin > cos)
-        {
-          cos /= sin;
-          sin = 1f;
-
-          if (invert)
-          {
-            xy[i1].x = Mathf.Lerp(xy[i0].x, xy[i2].x, cos);
-            xy[i2].x = xy[i1].x;
-          }
-        }
-        else if (cos > sin)
-        {
-          sin /= cos;
-          cos = 1f;
-
-          if (!invert)
-          {
-            xy[i2].y = Mathf.Lerp(xy[i0].y, xy[i2].y, sin);
-            xy[i3].y = xy[i2].y;
-          }
-        }
-        else
-        {
-          cos = 1f;
-          sin = 1f;
-        }
-
-        if (!invert) xy[i3].x = Mathf.Lerp(xy[i0].x, xy[i2].x, cos);
-        else xy[i1].y = Mathf.Lerp(xy[i0].y, xy[i2].y, sin);
-      }
-      else
-      {
-        if (cos > sin)
-        {
-          sin /= cos;
-          cos = 1f;
-
-          if (!invert)
-          {
-            xy[i1].y = Mathf.Lerp(xy[i0].y, xy[i2].y, sin);
-            xy[i2].y = xy[i1].y;
-          }
-        }
-        else if (sin > cos)
-        {
-          cos /= sin;
-          sin = 1f;
-
-          if (invert)
-          {
-            xy[i2].x = Mathf.Lerp(xy[i0].x, xy[i2].x, cos);
-            xy[i3].x = xy[i2].x;
-          }
-        }
-        else
-        {
-          cos = 1f;
-          sin = 1f;
-        }
-
-        if (invert) xy[i3].y = Mathf.Lerp(xy[i0].y, xy[i2].y, sin);
-        else xy[i1].x = Mathf.Lerp(xy[i0].x, xy[i2].x, cos);
-      }
     }
 
     /// <summary>

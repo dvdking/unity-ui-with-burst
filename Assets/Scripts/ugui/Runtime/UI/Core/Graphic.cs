@@ -384,25 +384,19 @@ namespace UnityEngine.UI
     {
       var list = ListPool<Canvas>.Get();
       gameObject.GetComponentsInParent(false, list);
+      m_Canvas = null;
+      
       if (list.Count > 0)
       {
         // Find the first active and enabled canvas.
         for (int i = 0; i < list.Count; ++i)
         {
-          if (list[i].isActiveAndEnabled)
-          {
-            m_Canvas = list[i];
-            break;
-          }
+          if (!list[i].isActiveAndEnabled)
+            continue;
 
-          // if we reached the end and couldn't find an active and enabled canvas, we should return null . case 1171433
-          if (i == list.Count - 1)
-            m_Canvas = null;
+          m_Canvas = list[i];
+          break;
         }
-      }
-      else
-      {
-        m_Canvas = null;
       }
 
       ListPool<Canvas>.Release(list);
@@ -503,8 +497,7 @@ namespace UnityEngine.UI
 #if UNITY_EDITOR
             GraphicRebuildTracker.TrackGraphic(this);
 #endif
-      if (s_WhiteTexture == null)
-        s_WhiteTexture = Texture2D.whiteTexture;
+      s_WhiteTexture ??= Texture2D.whiteTexture;
 
       SetAllDirty();
     }
@@ -605,18 +598,18 @@ namespace UnityEngine.UI
         case CanvasUpdate.PreRender:
           if (m_VertsDirty)
           {
-            Profiler.BeginSample("Geom");
+            // Profiler.BeginSample("Geom");
             UpdateGeometry(meshData);
             m_VertsDirty = false;
-            Profiler.EndSample();
+            // Profiler.EndSample();
           }
 
           if (m_MaterialDirty)
           {
-            Profiler.BeginSample("mat");
+            // Profiler.BeginSample("mat");
             UpdateMaterial();
             m_MaterialDirty = false;
-            Profiler.EndSample();
+            // Profiler.EndSample();
           }
 
           break;
@@ -656,21 +649,21 @@ namespace UnityEngine.UI
         s_VertexHelper = new();
 
       s_VertexHelper.SetMeshData(meshData);
-      Profiler.BeginSample("Populate");
+      // Profiler.BeginSample("Populate");
       if (rectTransform != null && rectTransform.rect is { width: >= 0, height: >= 0 })
         OnPopulateMesh(s_VertexHelper);
       else
         s_VertexHelper.Clear();
 
-      Profiler.EndSample();
+      // Profiler.EndSample();
     }
 
     public void SetMesh()
     {
-      Profiler.BeginSample("Set mesh");
+      // Profiler.BeginSample("Set mesh");
       workerMesh.RecalculateBounds();
       canvasRenderer.SetMesh(workerMesh);
-      Profiler.EndSample();
+      // Profiler.EndSample();
     }
 
     public Mesh workerMesh
