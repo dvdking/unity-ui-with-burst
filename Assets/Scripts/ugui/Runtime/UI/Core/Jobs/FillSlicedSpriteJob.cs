@@ -9,7 +9,7 @@ namespace UnityEngine.UI
 {
   //todo: no fill center job
   [BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-  public struct FillSlicedJob : IJob
+  public struct FillSlicedSpriteJob : IJob
   {
     [NoAlias] 
     [NativeDisableContainerSafetyRestriction]
@@ -50,10 +50,10 @@ namespace UnityEngine.UI
       var uvMin = new float2(s_UVScratch[x].x, s_UVScratch[y].y);
       var uvMax = new float2(s_UVScratch[x2].x, s_UVScratch[y2].y);
 
-      Verticies[vertIndex + 0] = (CreateVert(new(posMin.x, posMin.y, 0), Color, new(uvMin.x, uvMin.y, 0, 0)));
-      Verticies[vertIndex + 1] = (CreateVert(new(posMin.x, posMax.y, 0), Color, new(uvMin.x, uvMax.y, 0, 0)));
-      Verticies[vertIndex + 2] = (CreateVert(new(posMax.x, posMax.y, 0), Color, new(uvMax.x, uvMax.y, 0, 0)));
-      Verticies[vertIndex + 3] = (CreateVert(new(posMax.x, posMin.y, 0), Color, new(uvMax.x, uvMin.y, 0, 0)));
+      Verticies[vertIndex + 0] = (FillVertexUtil.CreateVert(new(posMin.x, posMin.y, 0), Color, new(uvMin.x, uvMin.y, 0, 0)));
+      Verticies[vertIndex + 1] = (FillVertexUtil.CreateVert(new(posMin.x, posMax.y, 0), Color, new(uvMin.x, uvMax.y, 0, 0)));
+      Verticies[vertIndex + 2] = (FillVertexUtil.CreateVert(new(posMax.x, posMax.y, 0), Color, new(uvMax.x, uvMax.y, 0, 0)));
+      Verticies[vertIndex + 3] = (FillVertexUtil.CreateVert(new(posMax.x, posMin.y, 0), Color, new(uvMax.x, uvMin.y, 0, 0)));
 
       Indicies[indIndex + 0] = (vertIndex);
       Indicies[indIndex + 1] = (ushort)(vertIndex + 1);
@@ -62,23 +62,6 @@ namespace UnityEngine.UI
       Indicies[indIndex + 3] = (ushort)(vertIndex + 2);
       Indicies[indIndex + 4] = (ushort)(vertIndex + 3);
       Indicies[indIndex + 5] = vertIndex;
-    }
-
-    private VertexHelper.VertexData CreateVert(float3 pos,
-      float4 color,
-      float4 uv)
-    {
-      return new()
-      {
-        pos = pos,
-        normal = VertexHelper.s_DefaultNormal,
-        tangent = VertexHelper.s_DefaultTangent,
-        color = color,
-        uv0 = uv
-        // uv1 = new float4(uvMax.x, uvMax.y, 0, 0),
-        // uv2 = new float4(uvMax.x, uvMax.y, 0, 0),
-        // uv3 = new float4(uvMax.x, uvMax.y, 0, 0),
-      };
     }
   }
 }

@@ -53,10 +53,7 @@ public class StressTest : MonoBehaviour
       _graphics.Add(p.GetComponent<Graphic>());
 
       if (i == 499)
-      {
-        // lastCanvas = Instantiate(lastCanvas, transform);
         break;
-      }
     }
 
     for (var i = 1; i < Count/500; i++)
@@ -65,7 +62,23 @@ public class StressTest : MonoBehaviour
       var rects = lastCanvas.GetComponentsInChildren<RectTransform>();
       _transforms.AddRange(rects.Where(x => x != lastCanvas.GetComponent<RectTransform>()));
       
-      var graphs = lastCanvas.GetComponentsInChildren<Graphic>();
+      var graphs = lastCanvas.GetComponentsInChildren<Image>();
+      foreach (var graph in graphs)
+      {
+        graph.fillMethod = Random.value > .5f ? Image.FillMethod.Horizontal : Image.FillMethod.Radial360;
+        graph.fillMethod = Random.value > .5f ? Image.FillMethod.Radial90 : Image.FillMethod.Radial180;
+        graph.fillAmount = Random.value;
+
+        var v = Random.value;
+        graph.type = v switch
+        {
+          > 0.7f => Image.Type.Sliced,
+          > 0.5f => Image.Type.Filled,
+          > 0.2f => Image.Type.Tiled,
+          _ => Image.Type.Simple
+        };
+        graph.rectTransform.sizeDelta = new Vector2(Random.Range(10, 350), Random.Range(10, 350));
+      }
       _graphics.AddRange(graphs.Where(x => x != lastCanvas.GetComponent<Graphic>()));
     }
 

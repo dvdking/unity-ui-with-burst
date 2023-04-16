@@ -394,8 +394,7 @@ namespace UnityEngine.UI
       get { return m_OverrideSprite != null ? m_OverrideSprite : sprite; }
     }
 
-    [NonSerialized]
-    private Sprite _lastActiveSprite;
+    [NonSerialized] private Sprite _lastActiveSprite;
 
     /// How the Image is drawn.
     [SerializeField] private Type m_Type = Type.Simple;
@@ -822,8 +821,8 @@ namespace UnityEngine.UI
         if (Application.isPlaying && activeSprite && activeSprite.associatedAlphaSplitTexture != null)
           return defaultETC1GraphicMaterial;
 #else
-                if (activeSprite && activeSprite.associatedAlphaSplitTexture != null)
-                    return defaultETC1GraphicMaterial;
+        if (activeSprite && activeSprite.associatedAlphaSplitTexture != null)
+          return defaultETC1GraphicMaterial;
 #endif
 
         return defaultMaterial;
@@ -1028,17 +1027,24 @@ namespace UnityEngine.UI
     /// </summary>
     void GenerateSimpleSprite(VertexHelper vh, bool lPreserveAspect)
     {
-      Vector4 v = GetDrawingDimensions(lPreserveAspect);
-      var uv = (activeSprite != null) ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
+      var v = GetDrawingDimensions(lPreserveAspect);
+      var uv = activeSprite != null ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
 
-      var color32 = colorFloat;
-      vh.AddVert(new Vector3(v.x, v.y), color32, new(uv.x, uv.y, 0, 0));
-      vh.AddVert(new Vector3(v.x, v.w), color32, new(uv.x, uv.w, 0, 0));
-      vh.AddVert(new Vector3(v.z, v.w), color32, new(uv.z, uv.w, 0, 0));
-      vh.AddVert(new Vector3(v.z, v.y), color32, new(uv.z, uv.y, 0, 0));
+      const int quadCount = 1;
+      const int vertCount = 4;
+      const int indiciesCount = 6;
+      vh.Reinit(quadCount * vertCount, quadCount * indiciesCount);
 
-      vh.AddTriangle(0, 1, 2);
-      vh.AddTriangle(2, 3, 0);
+      var job = new FillSimpleSpriteJob
+      {
+        Verticies = vh.m_Vertices,
+        Indicies = vh.m_Indices,
+        Dimensions = v,
+        Uv = uv,
+        Color32 = colorFloat
+      };
+
+      job.Run();
     }
 
     private void GenerateSprite(VertexHelper vh, bool lPreserveAspect)
@@ -1080,14 +1086,10 @@ namespace UnityEngine.UI
       }
     }
 
-    [NonSerialized]
-    private NativeArray<float2> s_VertScratch;
-    [NonSerialized]
-    NativeArray<float2> s_UVScratch;
-    [NonSerialized]
-    Vector4 outer, inner, padding, border;
-    [NonSerialized]
-    private bool _init = false;
+    [NonSerialized] private NativeArray<float2> s_VertScratch;
+    [NonSerialized] NativeArray<float2> s_UVScratch;
+    [NonSerialized] Vector4 outer, inner, padding, border;
+    [NonSerialized] private bool _init = false;
 
     /// <summary>
     /// Generate vertices for a 9-sliced Image.
@@ -1099,7 +1101,7 @@ namespace UnityEngine.UI
         GenerateSimpleSprite(toFill, false);
         return;
       }
-  
+
       //todo: do not update it every frame
       // if (!_init)
       {
@@ -1154,7 +1156,7 @@ namespace UnityEngine.UI
       const int indiciesCount = 6;
       toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
 
-      var job = new FillSlicedJob
+      var job = new FillSlicedSpriteJob
       {
         Verticies = toFill.m_Vertices,
         Indicies = toFill.m_Indices,
@@ -1164,7 +1166,7 @@ namespace UnityEngine.UI
       };
 
       job.Run();
-      
+
       s_VertScratch.Dispose();
       s_UVScratch.Dispose();
     }
@@ -1215,6 +1217,30 @@ namespace UnityEngine.UI
 
       if (tileHeight <= 0)
         tileHeight = yMax - yMin;
+
+      const int quadCount = 1;
+      const int vertCount = 4;
+      const int indiciesCount = 6;
+      toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+      
+      var job = new FillTiledSpriteJob
+      {
+        xMin = xMin,
+        xMax = xMax,
+        yMin = yMin,
+        yMax = yMax,
+        tileWidth = tileWidth,
+        tileHeight = tileHeight,
+        uvMin = uvMin,
+        uvMax = uvMax,
+        position = rect.position,
+        Color32 = colorFloat,
+        Verticies = toFill.m_Vertices,
+        Indicies = toFill.m_Indices,
+      };
+
+      job.Run();
+      return;
 
       if (activeSprite != null && (hasBorder || activeSprite.packed
                                              || activeSprite.texture != null && activeSprite.texture.wrapMode
@@ -1507,22 +1533,66 @@ namespace UnityEngine.UI
     /// </summary>
     unsafe void GenerateFilledSprite(VertexHelper toFill, bool preserveAspect)
     {
-
       if (m_FillAmount < 0.001f)
         return;
 
-      Vector4 v = GetDrawingDimensions(preserveAspect);
-      Vector4 outer = activeSprite != null ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
-      UIVertex uiv = UIVertex.simpleVert;
-      uiv.color = color;
+      var v = GetDrawingDimensions(preserveAspect);
+      var outer = activeSprite != null ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
+      // UIVertex uiv = UIVertex.simpleVert;
+      // uiv.color = color;
 
+      const int quadCount = 1;
+      const int vertCount = 4;
+      const int indiciesCount = 6;
+      if (m_FillAmount < 1f && m_FillMethod is not FillMethod.Horizontal and not FillMethod.Vertical)
+      {
+        switch (m_FillMethod)
+        {
+          case FillMethod.Radial90:
+            toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+            break;
+          case FillMethod.Radial180:
+          {
+            const int quadCountRadial180 = 2;
+            toFill.Reinit(quadCountRadial180 * vertCount, quadCountRadial180 * indiciesCount);
+            break;
+          }
+          case FillMethod.Radial360:
+          {
+            const int quadCountRadial360 = 4;
+            toFill.Reinit(quadCountRadial360 * vertCount, quadCountRadial360 * indiciesCount);
+            break;
+          }
+        }
+      }
+      else
+      {
+        toFill.Reinit(quadCount * vertCount, quadCount * indiciesCount);
+      }
+
+
+      var job = new FillFilledSpriteJob
+      {
+        Dimensions = v,
+        Outer = outer,
+        FillMethod = m_FillMethod,
+        FillOrigin = m_FillOrigin,
+        FillAmount = m_FillAmount,
+        Color32 = colorFloat,
+        Verticies = toFill.m_Vertices,
+        Indicies = toFill.m_Indices,
+        FillClockwise = m_FillClockwise
+      };
+
+      job.Run();
+
+      return;
       float tx0 = outer.x;
       float ty0 = outer.y;
       float tx1 = outer.z;
       float ty1 = outer.w;
-
       // Horizontal and vertical filled sprites are simple -- just end the Image prematurely
-      if (m_FillMethod == FillMethod.Horizontal || m_FillMethod == FillMethod.Vertical)
+      if (m_FillMethod is FillMethod.Horizontal or FillMethod.Vertical)
       {
         if (fillMethod == FillMethod.Horizontal)
         {
@@ -1660,7 +1730,7 @@ namespace UnityEngine.UI
                 fx1 = 1f;
               }
 
-              if (corner == 0 || corner == 3)
+              if (corner is 0 or 3)
               {
                 fy0 = 0f;
                 fy1 = 0.5f;
