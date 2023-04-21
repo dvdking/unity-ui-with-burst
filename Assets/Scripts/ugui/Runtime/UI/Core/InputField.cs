@@ -2702,7 +2702,7 @@ namespace UnityEngine.UI
         /// </summary>
         /// <param name="update">Which update loop we are in.</param>
         /// <param name="meshData"></param>
-        public virtual void Rebuild(CanvasUpdate update, Mesh.MeshData meshData)
+        public virtual void Rebuild(CanvasUpdate update)
         {
             switch (update)
             {
@@ -2712,16 +2712,7 @@ namespace UnityEngine.UI
             }
         }
 
-        public void SetMesh()
-        {
-        }
-
-        public void SetMesh(JobHandle? handle)
-        {
-        }
-
-        public Mesh workerMesh { get; }
-        public VertexHelper s_VertexHelper { get; }
+        public bool UseNativeBuffers => false;
 
         /// <summary>
         /// See ICanvasElement.LayoutComplete. Does nothing by default.
@@ -2795,22 +2786,22 @@ namespace UnityEngine.UI
 
         private void OnFillVBO(Mesh vbo)
         {
-            // using (var helper = new VertexHelper())
-            // {
-                // if (!isFocused)
-                // {
-                    // helper.FillMesh(vbo);
-                    // return;
-                // }
+            using (var helper = new VertexHelper())
+            {
+                if (!isFocused)
+                {
+                    helper.FillMesh(vbo);
+                    return;
+                }
 
-                // Vector2 roundingOffset = m_TextComponent.PixelAdjustPoint(Vector2.zero);
-                // if (!hasSelection)
-                    // GenerateCaret(helper, roundingOffset);
-                // else
-                    // GenerateHighlight(helper, roundingOffset);
+                Vector2 roundingOffset = m_TextComponent.PixelAdjustPoint(Vector2.zero);
+                if (!hasSelection)
+                    GenerateCaret(helper, roundingOffset);
+                else
+                    GenerateHighlight(helper, roundingOffset);
 
-                // helper.FillMesh(vbo);
-            // }
+                helper.FillMesh(vbo);
+            }
         }
 
         private void GenerateCaret(VertexHelper vbo, Vector2 roundingOffset)
@@ -2924,51 +2915,51 @@ namespace UnityEngine.UI
             if (gen.lineCount <= 0)
                 return;
 
-            // int currentLineIndex = DetermineCharacterLine(startChar, gen);
-            //
-            // int lastCharInLineIndex = GetLineEndPosition(gen, currentLineIndex);
-            //
-            // UIVertex vert = UIVertex.simpleVert;
-            // vert.uv0 = Vector2.zero;
-            // vert.color = selectionColor;
-            //
-            // int currentChar = startChar;
-            // while (currentChar <= endChar && currentChar < gen.characterCount)
-            // {
-            //     if (currentChar == lastCharInLineIndex || currentChar == endChar)
-            //     {
-            //         UICharInfo startCharInfo = gen.characters[startChar];
-            //         UICharInfo endCharInfo = gen.characters[currentChar];
-            //         Vector2 startPosition = new Vector2(startCharInfo.cursorPos.x / m_TextComponent.pixelsPerUnit, gen.lines[currentLineIndex].topY / m_TextComponent.pixelsPerUnit);
-            //         Vector2 endPosition = new Vector2((endCharInfo.cursorPos.x + endCharInfo.charWidth) / m_TextComponent.pixelsPerUnit, startPosition.y - gen.lines[currentLineIndex].height / m_TextComponent.pixelsPerUnit);
-            //
-            //         // Checking xMin as well due to text generator not setting position if char is not rendered.
-            //         if (endPosition.x > m_TextComponent.rectTransform.rect.xMax || endPosition.x < m_TextComponent.rectTransform.rect.xMin)
-            //             endPosition.x = m_TextComponent.rectTransform.rect.xMax;
-            //
-            //         var startIndex = vbo.currentVertCount;
-            //         vert.position = new Vector3(startPosition.x, endPosition.y, 0.0f) + (Vector3)roundingOffset;
-            //         vbo.AddVert(vert);
-            //
-            //         vert.position = new Vector3(endPosition.x, endPosition.y, 0.0f) + (Vector3)roundingOffset;
-            //         vbo.AddVert(vert);
-            //
-            //         vert.position = new Vector3(endPosition.x, startPosition.y, 0.0f) + (Vector3)roundingOffset;
-            //         vbo.AddVert(vert);
-            //
-            //         vert.position = new Vector3(startPosition.x, startPosition.y, 0.0f) + (Vector3)roundingOffset;
-            //         vbo.AddVert(vert);
-            //
-            //         vbo.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
-            //         vbo.AddTriangle(startIndex + 2, startIndex + 3, startIndex + 0);
-            //
-            //         startChar = currentChar + 1;
-            //         currentLineIndex++;
-            //
-            //         lastCharInLineIndex = GetLineEndPosition(gen, currentLineIndex);
-            //     }
-            //     currentChar++;
-            // }
+            int currentLineIndex = DetermineCharacterLine(startChar, gen);
+            
+            int lastCharInLineIndex = GetLineEndPosition(gen, currentLineIndex);
+            
+            UIVertex vert = UIVertex.simpleVert;
+            vert.uv0 = Vector2.zero;
+            vert.color = selectionColor;
+            
+            int currentChar = startChar;
+            while (currentChar <= endChar && currentChar < gen.characterCount)
+            {
+                if (currentChar == lastCharInLineIndex || currentChar == endChar)
+                {
+                    UICharInfo startCharInfo = gen.characters[startChar];
+                    UICharInfo endCharInfo = gen.characters[currentChar];
+                    Vector2 startPosition = new Vector2(startCharInfo.cursorPos.x / m_TextComponent.pixelsPerUnit, gen.lines[currentLineIndex].topY / m_TextComponent.pixelsPerUnit);
+                    Vector2 endPosition = new Vector2((endCharInfo.cursorPos.x + endCharInfo.charWidth) / m_TextComponent.pixelsPerUnit, startPosition.y - gen.lines[currentLineIndex].height / m_TextComponent.pixelsPerUnit);
+            
+                    // Checking xMin as well due to text generator not setting position if char is not rendered.
+                    if (endPosition.x > m_TextComponent.rectTransform.rect.xMax || endPosition.x < m_TextComponent.rectTransform.rect.xMin)
+                        endPosition.x = m_TextComponent.rectTransform.rect.xMax;
+            
+                    var startIndex = vbo.currentVertCount;
+                    vert.position = new Vector3(startPosition.x, endPosition.y, 0.0f) + (Vector3)roundingOffset;
+                    vbo.AddVert(vert);
+            
+                    vert.position = new Vector3(endPosition.x, endPosition.y, 0.0f) + (Vector3)roundingOffset;
+                    vbo.AddVert(vert);
+            
+                    vert.position = new Vector3(endPosition.x, startPosition.y, 0.0f) + (Vector3)roundingOffset;
+                    vbo.AddVert(vert);
+            
+                    vert.position = new Vector3(startPosition.x, startPosition.y, 0.0f) + (Vector3)roundingOffset;
+                    vbo.AddVert(vert);
+            
+                    vbo.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
+                    vbo.AddTriangle(startIndex + 2, startIndex + 3, startIndex + 0);
+            
+                    startChar = currentChar + 1;
+                    currentLineIndex++;
+            
+                    lastCharInLineIndex = GetLineEndPosition(gen, currentLineIndex);
+                }
+                currentChar++;
+            }
         }
 
         /// <summary>

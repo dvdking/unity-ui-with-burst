@@ -13,7 +13,7 @@ namespace UnityEngine.UI
   {
     [NoAlias] 
     [NativeDisableContainerSafetyRestriction]
-    public NativeArray<VertexHelper.VertexData> Verticies;
+    public NativeArray<NativeVertexHelper.VertexData> Verticies;
 
     [NoAlias] 
     [NativeDisableContainerSafetyRestriction]

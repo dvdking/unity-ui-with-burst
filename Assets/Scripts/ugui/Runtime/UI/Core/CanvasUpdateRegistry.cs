@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Unity.Jobs;
+using UnityEngine.Pool;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.UI.Collections;
@@ -44,6 +45,15 @@ namespace UnityEngine.UI
     MaxUpdateValue = 5
   }
 
+  public interface INativeRebuild : ICanvasElement
+  {
+    Mesh workerMesh { get; }
+    NativeVertexHelper LocalVertexHelper { get; }
+    
+    void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData);
+    void SetMesh();
+  }
+  
   /// <summary>
   /// This is an element that can live on a Canvas.
   /// </summary>
@@ -54,17 +64,14 @@ namespace UnityEngine.UI
     /// </summary>
     /// <param name="executing">The current CanvasUpdate stage being rebuild.</param>
     /// <param name="meshData"></param>
-    void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData);
+    void Rebuild(CanvasUpdate executing);
 
-    void SetMesh();
 
     /// <summary>
     /// Get the transform associated with the ICanvasElement.
     /// </summary>
     Transform transform { get; }
 
-    Mesh workerMesh { get; }
-    VertexHelper s_VertexHelper { get; }
 
     /// <summary>
     /// Callback sent when this ICanvasElement has completed layout.
@@ -201,7 +208,7 @@ namespace UnityEngine.UI
           try
           {
             if (ObjectValidForUpdate(rebuild))
-              rebuild.Rebuild((CanvasUpdate)i, default);
+              rebuild.Rebuild((CanvasUpdate)i);
           }
           catch (Exception e)
           {
@@ -227,18 +234,47 @@ namespace UnityEngine.UI
 
       m_PerformingGraphicUpdate = true;
 
+      var nativeRebuildElements = ListPool<INativeRebuild>.Get();
+      var rebuildElements = ListPool<ICanvasElement>.Get();
+
+      foreach (var canvasElement in m_GraphicRebuildQueue)
+      {
+        if (canvasElement is INativeRebuild nativeRebuild)
+          nativeRebuildElements.Add(nativeRebuild);
+        else
+          rebuildElements.Add(canvasElement);
+      }
+
       for (var i = (int)CanvasUpdate.PreRender; i < (int)CanvasUpdate.MaxUpdateValue; i++)
       {
         if (i == (int)CanvasUpdate.PreRender)
-          _dataArray = Mesh.AllocateWritableMeshData(m_GraphicRebuildQueue.Count);
+          _dataArray = Mesh.AllocateWritableMeshData(nativeRebuildElements.Count);
 
         UnityEngine.Profiling.Profiler.BeginSample(m_CanvasUpdateProfilerStrings[i]);
-        var count = m_GraphicRebuildQueue.Count;
+        
+        var count = rebuildElements.Count;
         for (var k = 0; k < count; k++)
         {
           try
           {
-            var element = m_GraphicRebuildQueue[k];
+            var element = rebuildElements[k];
+            if (ObjectValidForUpdate(element))
+            {
+              element.Rebuild((CanvasUpdate)i);
+            }
+          }
+          catch (Exception e)
+          {
+            Debug.LogException(e, rebuildElements[k].transform);
+          }
+        }
+        
+        count = nativeRebuildElements.Count;
+        for (var k = 0; k < count; k++)
+        {
+          try
+          {
+            var element = nativeRebuildElements[k];
             if (ObjectValidForUpdate(element))
             {
               var meshData = i == (int)CanvasUpdate.PreRender ? _dataArray[k] : default;
@@ -247,10 +283,9 @@ namespace UnityEngine.UI
           }
           catch (Exception e)
           {
-            Debug.LogException(e, m_GraphicRebuildQueue[k].transform);
+            Debug.LogException(e, nativeRebuildElements[k].transform);
           }
         }
-
 
         // Profiler.BeginSample("Final set meshes to canvas renderer");
         _meshes ??= new();
@@ -259,27 +294,26 @@ namespace UnityEngine.UI
         {
           for (var k = 0; k < count; k++)
           {
-            var element = m_GraphicRebuildQueue[k];
+            var element = nativeRebuildElements[k];
             _meshes.Add(element.workerMesh);
 
             var meshData = _dataArray[k];
             meshData.subMeshCount = 1;
 
-            meshData.SetSubMesh(0, new(0, element.s_VertexHelper.m_Indices.Length));
+            meshData.SetSubMesh(0, new(0, element.LocalVertexHelper.m_Indices.Length));
           }
 
           Mesh.ApplyAndDisposeWritableMeshData(_dataArray, _meshes, MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds);
 
           for (var k = 0; k < count; k++)
           {
-            var element = m_GraphicRebuildQueue[k];
+            var element = nativeRebuildElements[k];
             element.SetMesh();
           }
 
           _meshes.Clear();
         }
         // Profiler.EndSample();
-
 
         UnityEngine.Profiling.Profiler.EndSample();
       }

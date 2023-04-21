@@ -20,9 +20,7 @@ namespace UnityEngine.UI
   [DisallowMultipleComponent]
   [RequireComponent(typeof(RectTransform))]
   [ExecuteAlways]
-  public abstract class Graphic
-    : UIBehaviour,
-      ICanvasElement
+  public abstract class Graphic : UIBehaviour, ICanvasElement
   {
     static protected Material s_DefaultUI = null;
     static protected Texture2D s_WhiteTexture = null;
@@ -142,7 +140,9 @@ namespace UnityEngine.UI
       }
     }
 
-    [SerializeField] private Vector4 m_RaycastPadding = new Vector4();
+    public bool UseNativeBuffers { get; protected set; }
+
+    [SerializeField] private Vector4 m_RaycastPadding = new();
 
     /// <summary>
     /// Padding to be applied to the masking
@@ -161,20 +161,19 @@ namespace UnityEngine.UI
     [NonSerialized] private CanvasRenderer m_CanvasRenderer;
     [NonSerialized] private Canvas m_Canvas;
 
-    [NonSerialized] private bool m_VertsDirty;
-    [NonSerialized] private bool m_MaterialDirty;
+    [NonSerialized] protected bool m_VertsDirty;
+    [NonSerialized] protected bool m_MaterialDirty;
 
     [NonSerialized] protected UnityAction m_OnDirtyLayoutCallback;
     [NonSerialized] protected UnityAction m_OnDirtyVertsCallback;
     [NonSerialized] protected UnityAction m_OnDirtyMaterialCallback;
 
-    [NonSerialized] protected Mesh s_Mesh;
+            [NonSerialized] protected static Mesh s_Mesh;
+            [NonSerialized] private static readonly VertexHelper s_VertexHelper = new VertexHelper();
     // [NonSerialized] public VertexHelper s_VertexHelper;
 
     // Tween controls for the Graphic
     [NonSerialized] private readonly TweenRunner<ColorTween> m_ColorTweenRunner;
-
-    protected bool useLegacyMeshGeneration { get; set; }
 
     // Called by Unity prior to deserialization,
     // should not be called by users
@@ -183,7 +182,6 @@ namespace UnityEngine.UI
       if (m_ColorTweenRunner == null)
         m_ColorTweenRunner = new TweenRunner<ColorTween>();
       m_ColorTweenRunner.Init(this);
-      useLegacyMeshGeneration = true;
     }
 
     protected override void Awake()
@@ -528,12 +526,6 @@ namespace UnityEngine.UI
 #endif
       GraphicRegistry.UnregisterGraphicForCanvas(canvas, this);
       CanvasUpdateRegistry.UnRegisterCanvasElementForRebuild(this);
-      if (s_Mesh)
-        Destroy(s_Mesh);
-      
-      s_Mesh = null;
-
-      s_VertexHelper?.Dispose();
 
       base.OnDestroy();
     }
@@ -588,7 +580,7 @@ namespace UnityEngine.UI
     /// <remarks>
     /// See CanvasUpdateRegistry for more details on the canvas update cycle.
     /// </remarks>
-    public virtual void Rebuild(CanvasUpdate update, Mesh.MeshData meshData)
+    public virtual void Rebuild(CanvasUpdate update)
     {
       if (canvasRenderer == null || canvasRenderer.cull)
         return;
@@ -599,7 +591,7 @@ namespace UnityEngine.UI
           if (m_VertsDirty)
           {
             // Profiler.BeginSample("Geom");
-            UpdateGeometry(meshData);
+            UpdateGeometry();
             m_VertsDirty = false;
             // Profiler.EndSample();
           }
@@ -615,8 +607,6 @@ namespace UnityEngine.UI
           break;
       }
     }
-
-    public VertexHelper s_VertexHelper { get; set; }
 
     public virtual void LayoutComplete()
     {
@@ -643,30 +633,18 @@ namespace UnityEngine.UI
     /// Call to update the geometry of the Graphic onto the CanvasRenderer.
     /// </summary>
     /// <param name="meshData"></param>
-    protected virtual void UpdateGeometry(Mesh.MeshData meshData)
+    protected virtual void UpdateGeometry()
     {
-      if (s_VertexHelper == null)
-        s_VertexHelper = new();
-
-      s_VertexHelper.SetMeshData(meshData);
-      // Profiler.BeginSample("Populate");
-      if (rectTransform != null && rectTransform.rect is { width: >= 0, height: >= 0 })
+      if (rectTransform != null && rectTransform.rect.width >= 0 && rectTransform.rect.height >= 0)
         OnPopulateMesh(s_VertexHelper);
       else
-        s_VertexHelper.Clear();
+        s_VertexHelper.Clear(); // clear the vertex helper so invalid graphics dont draw.
 
-      // Profiler.EndSample();
-    }
-
-    public void SetMesh()
-    {
-      // Profiler.BeginSample("Set mesh");
-      workerMesh.RecalculateBounds();
+      s_VertexHelper.FillMesh(workerMesh);
       canvasRenderer.SetMesh(workerMesh);
-      // Profiler.EndSample();
     }
 
-    public Mesh workerMesh
+    private Mesh workerMesh
     {
       get
       {
@@ -688,16 +666,17 @@ namespace UnityEngine.UI
     /// <remarks>
     /// Used by Text, UI.Image, and RawImage for example to generate vertices specific to their use case.
     /// </remarks>
+    
+
     protected virtual void OnPopulateMesh(VertexHelper vh)
     {
       var r = GetPixelAdjustedRect();
       var v = new float4(r.x, r.y, r.x + r.width, r.y + r.height);
 
-      var color32 = colorFloat;
-      vh.AddVert(new float3(v.x, v.y, 0), color32, new(0f, 0f, 0, 0));
-      vh.AddVert(new float3(v.x, v.w, 0), color32, new(0f, 1f, 0, 0));
-      vh.AddVert(new float3(v.z, v.w, 0), color32, new(1f, 1f, 0, 0));
-      vh.AddVert(new float3(v.z, v.y, 0), color32, new(1f, 0f, 0, 0));
+      vh.AddVert(new float3(v.x, v.y, 0), color, new(0f, 0f, 0, 0));
+      vh.AddVert(new float3(v.x, v.w, 0), color, new(0f, 1f, 0, 0));
+      vh.AddVert(new float3(v.z, v.w, 0), color, new(1f, 1f, 0, 0));
+      vh.AddVert(new float3(v.z, v.y, 0), color, new(1f, 0f, 0, 0));
 
       vh.AddTriangle(0, 1, 2);
       vh.AddTriangle(2, 3, 0);

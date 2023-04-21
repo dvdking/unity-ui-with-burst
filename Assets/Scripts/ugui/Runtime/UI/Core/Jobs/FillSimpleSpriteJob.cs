@@ -10,7 +10,7 @@ namespace UnityEngine.UI
   public struct FillSimpleSpriteJob : IJob
   {
     [NoAlias] [NativeDisableContainerSafetyRestriction]
-    public NativeArray<VertexHelper.VertexData> Verticies;
+    public NativeArray<NativeVertexHelper.VertexData> Verticies;
 
     [NoAlias] [NativeDisableContainerSafetyRestriction]
     public NativeArray<ushort> Indicies;

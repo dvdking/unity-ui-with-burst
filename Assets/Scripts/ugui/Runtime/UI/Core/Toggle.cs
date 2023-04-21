@@ -126,7 +126,7 @@ namespace UnityEngine.UI
 
 #endif // if UNITY_EDITOR
 
-        public virtual void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData)
+        public virtual void Rebuild(CanvasUpdate executing)
         {
 #if UNITY_EDITOR
             if (executing == CanvasUpdate.Prelayout)
@@ -143,7 +143,7 @@ namespace UnityEngine.UI
         }
 
         public Mesh workerMesh { get; }
-        public VertexHelper s_VertexHelper { get; }
+        public NativeVertexHelper SNativeVertexHelper { get; }
 
         public virtual void LayoutComplete()
         {}

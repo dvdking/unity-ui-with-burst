@@ -529,7 +529,7 @@ namespace UnityEngine.UI
         /// </summary>
         /// <param name="executing">The current step in the rendering CanvasUpdate cycle.</param>
         /// <param name="meshData"></param>
-        public virtual void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData)
+        public virtual void Rebuild(CanvasUpdate executing)
         {
             if (executing == CanvasUpdate.Prelayout)
             {
@@ -556,7 +556,8 @@ namespace UnityEngine.UI
         }
 
         public Mesh workerMesh { get; }
-        public VertexHelper s_VertexHelper { get; }
+        public NativeVertexHelper SNativeVertexHelper { get; }
+        public bool UseNativeBuffers => false;
 
         public virtual void LayoutComplete()
         {}

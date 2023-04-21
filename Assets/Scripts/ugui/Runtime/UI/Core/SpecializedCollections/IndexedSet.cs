@@ -96,7 +96,7 @@ namespace UnityEngine.UI.Collections
 
         public IEnumerator<T> GetEnumerator()
         {
-            throw new System.NotImplementedException();
+            return m_List.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()

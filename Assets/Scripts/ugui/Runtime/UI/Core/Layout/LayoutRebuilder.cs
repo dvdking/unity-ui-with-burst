@@ -43,13 +43,10 @@ namespace UnityEngine.UI
             MarkLayoutForRebuild(driven);
         }
 
-        public void SetMesh()
-        {
-        }
-
         public Transform transform { get { return m_ToRebuild; }}
         public Mesh workerMesh { get; }
-        public VertexHelper s_VertexHelper { get; }
+        public NativeVertexHelper SNativeVertexHelper { get; }
+        public bool UseNativeBuffers => false;
 
         /// <summary>
         /// Has the native representation of this LayoutRebuilder been destroyed?
@@ -76,11 +73,11 @@ namespace UnityEngine.UI
         {
             var rebuilder = s_Rebuilders.Get();
             rebuilder.Initialize(layoutRoot);
-            rebuilder.Rebuild(CanvasUpdate.Layout, default);
+            rebuilder.Rebuild(CanvasUpdate.Layout);
             s_Rebuilders.Release(rebuilder);
         }
 
-        public void Rebuild(CanvasUpdate executing, Mesh.MeshData meshData)
+        public void Rebuild(CanvasUpdate executing)
         {
             switch (executing)
             {

@@ -20,7 +20,7 @@ namespace UnityEngine.UI
   /// <summary>
   ///   Displays a Sprite inside the UI System.
   /// </summary>
-  public sealed class Image : MaskableGraphic, ISerializationCallbackReceiver, ILayoutElement, ICanvasRaycastFilter
+  public class Image : NativeMaskableGraphic, ISerializationCallbackReceiver, ILayoutElement, ICanvasRaycastFilter
   {
     /// <summary>
     /// Image fill type controls how to display the image.
@@ -710,7 +710,7 @@ namespace UnityEngine.UI
 
     protected Image()
     {
-      useLegacyMeshGeneration = false;
+      UseNativeBuffers = true;
     }
 
     /// <summary>
@@ -925,24 +925,20 @@ namespace UnityEngine.UI
       }
     }
 
-    /// <summary>
     /// Update the UI renderer mesh.
     /// </summary>
-    protected override void OnPopulateMesh(VertexHelper toFill)
+    protected override void OnPopulateMeshNative(NativeVertexHelper toFill)
     {
       if (activeSprite is null)
       {
-        base.OnPopulateMesh(toFill);
+        base.OnPopulateMeshNative(toFill);
         return;
       }
 
       switch (type)
       {
         case Type.Simple:
-          if (!useSpriteMesh)
-            GenerateSimpleSprite(toFill, m_PreserveAspect);
-          else
-            GenerateSprite(toFill, m_PreserveAspect);
+          GenerateSimpleSprite(toFill, m_PreserveAspect);
           break;
         case Type.Sliced:
           GenerateSlicedSprite(toFill);
@@ -1025,7 +1021,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// Generate vertices for a simple Image.
     /// </summary>
-    void GenerateSimpleSprite(VertexHelper vh, bool lPreserveAspect)
+    void GenerateSimpleSprite(NativeVertexHelper vh, bool lPreserveAspect)
     {
       var v = GetDrawingDimensions(lPreserveAspect);
       var uv = activeSprite != null ? Sprites.DataUtility.GetOuterUV(activeSprite) : Vector4.zero;
@@ -1047,44 +1043,6 @@ namespace UnityEngine.UI
       job.Run();
     }
 
-    private void GenerateSprite(VertexHelper vh, bool lPreserveAspect)
-    {
-      var spriteSize = new Vector2(activeSprite.rect.width, activeSprite.rect.height);
-
-      // Covert sprite pivot into normalized space.
-      var spritePivot = activeSprite.pivot / spriteSize;
-      var rectPivot = rectTransform.pivot;
-      Rect r = GetPixelAdjustedRect();
-
-      if (lPreserveAspect & spriteSize.sqrMagnitude > 0.0f)
-      {
-        PreserveSpriteAspectRatio(ref r, spriteSize);
-      }
-
-      var drawingSize = new Vector2(r.width, r.height);
-      var spriteBoundSize = activeSprite.bounds.size;
-
-      // Calculate the drawing offset based on the difference between the two pivots.
-      var drawOffset = (rectPivot - spritePivot) * drawingSize;
-
-      var color32 = colorFloat;
-
-      Vector2[] vertices = activeSprite.vertices;
-      Vector2[] uvs = activeSprite.uv;
-      for (int i = 0; i < vertices.Length; ++i)
-      {
-        vh.AddVert(new Vector3((vertices[i].x / spriteBoundSize.x) * drawingSize.x - drawOffset.x,
-            (vertices[i].y / spriteBoundSize.y) * drawingSize.y - drawOffset.y),
-          color32,
-          new(uvs[i].x, uvs[i].y, 0, 0));
-      }
-
-      UInt16[] triangles = activeSprite.triangles;
-      for (int i = 0; i < triangles.Length; i += 3)
-      {
-        vh.AddTriangle(triangles[i + 0], triangles[i + 1], triangles[i + 2]);
-      }
-    }
 
     [NonSerialized] private NativeArray<float2> s_VertScratch;
     [NonSerialized] NativeArray<float2> s_UVScratch;
@@ -1094,7 +1052,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// Generate vertices for a 9-sliced Image.
     /// </summary>
-    private void GenerateSlicedSprite(VertexHelper toFill)
+    private void GenerateSlicedSprite(NativeVertexHelper toFill)
     {
       if (!hasBorder)
       {
@@ -1178,7 +1136,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// Generate vertices for a tiled Image.
     /// </summary>
-    void GenerateTiledSprite(VertexHelper toFill)
+    void GenerateTiledSprite(NativeVertexHelper toFill)
     {
       Vector4 outer, inner, border;
       Vector2 spriteSize;
@@ -1287,7 +1245,7 @@ namespace UnityEngine.UI
     /// <summary>
     /// Generate vertices for a filled Image.
     /// </summary>
-    void GenerateFilledSprite(VertexHelper toFill, bool preserveAspect)
+    void GenerateFilledSprite(NativeVertexHelper toFill, bool preserveAspect)
     {
 
       const int quadCount = 1;
