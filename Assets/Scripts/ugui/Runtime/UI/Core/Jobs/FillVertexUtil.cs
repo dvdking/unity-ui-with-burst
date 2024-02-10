@@ -13,8 +13,8 @@ namespace UnityEngine.UI
       return new()
       {
         pos = pos,
-        normal = NativeVertexHelper.s_DefaultNormal,
-        tangent = NativeVertexHelper.s_DefaultTangent,
+        normal = NativeVertexHelper.DefaultNormal,
+        tangent = NativeVertexHelper.DefaultTangent,
         color = color,
         uv0 = uv
         // uv1 = new float4(uvMax.x, uvMax.y, 0, 0),

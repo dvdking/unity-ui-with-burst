@@ -61,8 +61,8 @@ namespace UnityEngine.UI
 
       var job = new FillSimpleSpriteJob
       {
-        Verticies = vh.m_Vertices,
-        Indicies = vh.m_Indices,
+        Verticies = vh.Vertices,
+        Indicies = vh.Indices,
         Dimensions = new(v.xMin, v.yMin, v.xMax, v.yMax),
         Uv = uv,
         Color32 = colorFloat

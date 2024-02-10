@@ -1033,8 +1033,8 @@ namespace UnityEngine.UI
 
       var job = new FillSimpleSpriteJob
       {
-        Verticies = vh.m_Vertices,
-        Indicies = vh.m_Indices,
+        Verticies = vh.Vertices,
+        Indicies = vh.Indices,
         Dimensions = v,
         Uv = uv,
         Color32 = colorFloat
@@ -1119,8 +1119,8 @@ namespace UnityEngine.UI
 
       var job = new FillSlicedSpriteJob
       {
-        Verticies = toFill.m_Vertices,
-        Indicies = toFill.m_Indices,
+        Verticies = toFill.Vertices,
+        Indicies = toFill.Indices,
         Color = colorFloat,
         s_VertScratch = s_VertScratch,
         s_UVScratch = s_UVScratch,
@@ -1197,8 +1197,8 @@ namespace UnityEngine.UI
         uvMax = uvMax,
         position = rect.position,
         Color32 = colorFloat,
-        Verticies = toFill.m_Vertices,
-        Indicies = toFill.m_Indices,
+        Verticies = toFill.Vertices,
+        Indicies = toFill.Indices,
       };
 
       job.Run();
@@ -1293,8 +1293,8 @@ namespace UnityEngine.UI
         FillOrigin = m_FillOrigin,
         FillAmount = m_FillAmount,
         Color32 = colorFloat,
-        Verticies = toFill.m_Vertices,
-        Indicies = toFill.m_Indices,
+        Verticies = toFill.Vertices,
+        Indicies = toFill.Indices,
         FillClockwise = m_FillClockwise
       };
 

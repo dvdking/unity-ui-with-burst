@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -142,25 +143,9 @@ namespace UnityEngine.UI
     /// </summary>
     public virtual void Cull(Rect clipRect, bool validRect)
     {
-      var cull = false;
-      if (validRect)
-      {
-        var rootCanvas = rootCanvasRect;
-        OverlapsCheckJob.Overlaps(rootCanvas, clipRect, out var overlaps);
-        cull = !overlaps;
-      }
-      
+      RecalcRectCache();
+      var cull = !validRect || !clipRect.Overlaps(rootCanvasRect, true);
       UpdateCull(cull);
-    }
-
-    [BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-    public static class OverlapsCheckJob
-    {
-      [BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-      public static void Overlaps(in Rect rootCanvasRect, in Rect clipRect, out bool result)
-      {
-        result = clipRect.Overlaps(rootCanvasRect, true);
-      }
     }
 
     private void UpdateCull(bool cull)
@@ -198,12 +183,14 @@ namespace UnityEngine.UI
       SetMaterialDirty();
 
       if (isMaskingGraphic)
-      {
         MaskUtilities.NotifyStencilStateChanged(this);
-      }
 
+      RecalcRectCache();
+    }
 
-      if (!_gotCorners)
+    private void RecalcRectCache()
+    {
+      if (!_gotCorners || transform.hasChanged)
       {
         rectTransform.GetWorldCorners(m_Corners);
 

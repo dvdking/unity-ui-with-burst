@@ -192,11 +192,15 @@ namespace UnityEngine.UI
     private void PerformUpdate()
     {
       UISystemProfilerApi.BeginSample(UISystemProfilerApi.SampleType.Layout);
-      CleanInvalidItems();
+      Profiler.BeginSample("Clear invalid");
+      // CleanInvalidItems();
+      Profiler.EndSample();
 
       m_PerformingLayoutUpdate = true;
 
+      Profiler.BeginSample("Sort");
       m_LayoutRebuildQueue.Sort(s_SortLayoutFunction);
+      Profiler.EndSample();
 
       for (int i = 0; i <= (int)CanvasUpdate.PostLayout; i++)
       {
@@ -239,6 +243,9 @@ namespace UnityEngine.UI
 
       foreach (var canvasElement in m_GraphicRebuildQueue)
       {
+        if(((Graphic)canvasElement).canvasRenderer.cull)
+          continue;
+        
         if (canvasElement is INativeRebuild nativeRebuild)
           nativeRebuildElements.Add(nativeRebuild);
         else
@@ -300,10 +307,19 @@ namespace UnityEngine.UI
             var meshData = _dataArray[k];
             meshData.subMeshCount = 1;
 
-            meshData.SetSubMesh(0, new(0, element.LocalVertexHelper.m_Indices.Length));
+            try
+            {
+              meshData.SetSubMesh(0, new(0, element.LocalVertexHelper.IndiciesLength));
+            }
+            catch (Exception e)
+            {
+              Debug.LogError(e);
+              throw;
+            }
           }
 
           Mesh.ApplyAndDisposeWritableMeshData(_dataArray, _meshes, MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds);
+          _dataArray = default;
 
           for (var k = 0; k < count; k++)
           {
